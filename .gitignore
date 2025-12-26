@@ -1,0 +1,65 @@
+# Build outputs
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+
+# IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+*.userprefs
+*.csproj.user
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Sensitive files - NEVER COMMIT
+*.env
+.env.*
+credentials*
+*secret*
+*token*
+*.key
+*.pem
+
+# KSP specific
+GameData/T16000M_FCS/settings.cfg
+*.craft
+*.sfs
+*.loadmeta
+
+# Unity/Mono
+Library/
+Temp/
+*.pidb
+*.unitypackage
+
+# Logs
+*.log
+KSP.log
+output_log.txt
+
+# Package manager
+packages/
+*.nupkg
+
+# Test results
+TestResults/
+*.trx
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Claude Code internal
+.claude/
+
+# Local symlinks (user-specific paths)
+Kerbal Space Program*
