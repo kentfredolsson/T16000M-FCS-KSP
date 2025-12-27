@@ -13,6 +13,15 @@ namespace T16000M_FCS
         // Hotkeys
         public KeyCode ToggleKey = KeyCode.F8;
         public KeyCode GUIKey = KeyCode.F9;
+        public KeyCode HUDKey = KeyCode.F10;
+
+        // HUD Settings
+        public bool HUDEnabled = true;
+        public float HUDScale = 1.0f;
+        public float HUDOpacity = 0.9f;
+        public float HUDColorR = 0f;
+        public float HUDColorG = 1f;
+        public float HUDColorB = 0.5f;
 
         // Axis mappings (Unity Input axis names)
         public string PitchAxis = "Joy1 Axis 2";
@@ -101,6 +110,16 @@ namespace T16000M_FCS
                     config.ToggleKey = (KeyCode)Enum.Parse(typeof(KeyCode), settings.GetValue("ToggleKey"));
                 if (settings.HasValue("GUIKey"))
                     config.GUIKey = (KeyCode)Enum.Parse(typeof(KeyCode), settings.GetValue("GUIKey"));
+                if (settings.HasValue("HUDKey"))
+                    config.HUDKey = (KeyCode)Enum.Parse(typeof(KeyCode), settings.GetValue("HUDKey"));
+
+                // HUD Settings
+                if (settings.HasValue("HUDEnabled")) config.HUDEnabled = bool.Parse(settings.GetValue("HUDEnabled"));
+                if (settings.HasValue("HUDScale")) config.HUDScale = float.Parse(settings.GetValue("HUDScale"));
+                if (settings.HasValue("HUDOpacity")) config.HUDOpacity = float.Parse(settings.GetValue("HUDOpacity"));
+                if (settings.HasValue("HUDColorR")) config.HUDColorR = float.Parse(settings.GetValue("HUDColorR"));
+                if (settings.HasValue("HUDColorG")) config.HUDColorG = float.Parse(settings.GetValue("HUDColorG"));
+                if (settings.HasValue("HUDColorB")) config.HUDColorB = float.Parse(settings.GetValue("HUDColorB"));
 
                 // Axes
                 if (settings.HasValue("PitchAxis")) config.PitchAxis = settings.GetValue("PitchAxis");
@@ -164,6 +183,15 @@ namespace T16000M_FCS
                 // Hotkeys
                 settings.AddValue("ToggleKey", ToggleKey.ToString());
                 settings.AddValue("GUIKey", GUIKey.ToString());
+                settings.AddValue("HUDKey", HUDKey.ToString());
+
+                // HUD Settings
+                settings.AddValue("HUDEnabled", HUDEnabled.ToString());
+                settings.AddValue("HUDScale", HUDScale.ToString());
+                settings.AddValue("HUDOpacity", HUDOpacity.ToString());
+                settings.AddValue("HUDColorR", HUDColorR.ToString());
+                settings.AddValue("HUDColorG", HUDColorG.ToString());
+                settings.AddValue("HUDColorB", HUDColorB.ToString());
 
                 // Axes
                 settings.AddValue("PitchAxis", PitchAxis);
