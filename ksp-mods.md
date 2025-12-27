@@ -45,26 +45,26 @@ Main plugin logic:
 ```
 Joy0_BrakesButton = 3      // Button 3 = Brakes toggle
 Joy0_StageButton = 0       // Button 0 = Stage
-Joy0_SASButton = 4         // Button 4 = SAS toggle (swapped from 10)
-Joy0_RCSButton = 10        // Button 10 = RCS toggle (swapped from 4)
+Joy0_SASButton = 10        // Button 10 = SAS toggle
+Joy0_RCSButton = 4         // Button 4 = RCS toggle
 Joy0_AbortButton = -1      // Disabled (no conflict with AG0)
 
-Joy0_AG0Button = 5         // Button 5 = AG0 (swapped from 11)
-Joy0_AG1Button = 15        // Button 15 (swapped from 9)
-Joy0_AG2Button = 14        // Button 14 (swapped from 8)
-Joy0_AG3Button = 13        // Button 13 (swapped from 7)
-Joy0_AG4Button = 7         // Button 7 (swapped from 13)
-Joy0_AG5Button = 8         // Button 8 (swapped from 14)
-Joy0_AG6Button = 9         // Button 9 (swapped from 15)
-Joy0_AG7Button = 11        // Button 11 (swapped from 5)
-Joy0_AG8Button = 12        // Button 12 (swapped from 6)
-Joy0_AG9Button = 6         // Button 6 (swapped from 12)
+Joy0_AG0Button = 11        // Button 11
+Joy0_AG1Button = 9         // Button 9
+Joy0_AG2Button = 8         // Button 8
+Joy0_AG3Button = 7         // Button 7
+Joy0_AG4Button = 13        // Button 13
+Joy0_AG5Button = 14        // Button 14
+Joy0_AG6Button = 15        // Button 15
+Joy0_AG7Button = 5         // Button 5
+Joy0_AG8Button = 6         // Button 6
+Joy0_AG9Button = 12        // Button 12
 ```
 
-**Physical Layout (Base) - After Swap:**
+**Physical Layout (Base):**
 ```
-Top Row (L-R):    [10:RCS] [11:AG7] [12:AG8] [6:AG9] [5:AG0] [4:SAS]
-Bottom Row (L-R): [15:AG1] [14:AG2] [13:AG3] [7:AG4] [8:AG5] [9:AG6]
+Top Row (L-R):    [4:RCS] [5:AG7] [6:AG8] [12:AG9] [11:AG0] [10:SAS]
+Bottom Row (L-R): [9:AG1] [8:AG2] [7:AG3] [13:AG4] [14:AG5] [15:AG6]
 ```
 
 **Grip:**
@@ -77,8 +77,8 @@ Bottom Row (L-R): [15:AG1] [14:AG2] [13:AG3] [7:AG4] [8:AG5] [9:AG6]
 Joy1_LightsButton = 0      // Button 0 = Lights toggle
 Joy1_AG0Button = 1         // Button 1 = AG0
 Joy1_GearButton = 2        // Button 2 = Gear toggle
-Joy1_AG2DownButton = 3     // Button 3 = AG2 (down lever)
-Joy1_AG1UpButton = 4       // Button 4 = AG1 (up lever)
+Joy1_AG1UpButton = 3       // Button 3 = AG1 (up lever) - swapped
+Joy1_AG2DownButton = 4     // Button 4 = AG2 (down lever) - swapped
 Joy1_AbortButton = 5       // Button 5 = ABORT
 
 // All other Joy1 buttons disabled (-1) to avoid overlaps:

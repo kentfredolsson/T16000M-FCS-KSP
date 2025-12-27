@@ -38,23 +38,23 @@ namespace T16000M_FCS
         public int Joy0_StageButton = 0;       // Trigger = Stage
         public int Joy0_BrakesButton = 3;      // Grip button = Brakes toggle
 
-        // After swap: 10↔4, 11↔5, 12↔6, 13↔7, 14↔8, 15↔9
-        public int Joy0_RCSButton = 10;        // Was 4, now 10
-        public int Joy0_SASButton = 4;         // Was 10, now 4
+        // Swap: 10↔4, 11↔5, 12↔6, 13↔7, 14↔8, 15↔9
+        public int Joy0_RCSButton = 4;         // Swapped: was 10, now 4
+        public int Joy0_SASButton = 10;        // Swapped: was 4, now 10
 
-        public int Joy0_AbortButton = -1;      // DISABLED - was conflicting with AG0
+        public int Joy0_AbortButton = -1;      // DISABLED - no conflict with AG0
 
         // Action Groups on Joy0 (after swap)
-        public int Joy0_AG0Button = 5;         // Was 11, now 5 (AG0 = Custom10)
-        public int Joy0_AG1Button = 15;        // Was 9, now 15
-        public int Joy0_AG2Button = 14;        // Was 8, now 14
-        public int Joy0_AG3Button = 13;        // Was 7, now 13
-        public int Joy0_AG4Button = 7;         // Was 13, now 7
-        public int Joy0_AG5Button = 8;         // Was 14, now 8
-        public int Joy0_AG6Button = 9;         // Was 15, now 9
-        public int Joy0_AG7Button = 11;        // Was 5, now 11
-        public int Joy0_AG8Button = 12;        // Was 6, now 12
-        public int Joy0_AG9Button = 6;         // Was 12, now 6
+        public int Joy0_AG0Button = 11;        // Swapped: was 5, now 11 (AG0 = Custom10)
+        public int Joy0_AG1Button = 9;         // Swapped: was 15, now 9
+        public int Joy0_AG2Button = 8;         // Swapped: was 14, now 8
+        public int Joy0_AG3Button = 7;         // Swapped: was 13, now 7
+        public int Joy0_AG4Button = 13;        // Swapped: was 7, now 13
+        public int Joy0_AG5Button = 14;        // Swapped: was 8, now 14
+        public int Joy0_AG6Button = 15;        // Swapped: was 9, now 15
+        public int Joy0_AG7Button = 5;         // Swapped: was 11, now 5
+        public int Joy0_AG8Button = 6;         // Swapped: was 12, now 6
+        public int Joy0_AG9Button = 12;        // Swapped: was 6, now 12
 
         // ============================================
         // Joystick 1 (TWCS Throttle) Button Mappings
@@ -64,8 +64,8 @@ namespace T16000M_FCS
         public int Joy1_LightsButton = 0;      // Button 0 = Lights toggle
         public int Joy1_AG0Button = 1;         // Button 1 = AG0
         public int Joy1_GearButton = 2;        // Button 2 = Gear toggle ONLY (no brakes)
-        public int Joy1_AG2DownButton = 3;     // Button 3 = AG2 (down lever)
-        public int Joy1_AG1UpButton = 4;       // Button 4 = AG1 (up lever)
+        public int Joy1_AG2DownButton = 4;     // Button 4 = AG2 (swapped from 3)
+        public int Joy1_AG1UpButton = 3;       // Button 3 = AG1 (swapped from 4)
         public int Joy1_AbortButton = 5;       // Button 5 = ABORT!
 
         // Disabled Joy1 buttons to avoid conflicts
