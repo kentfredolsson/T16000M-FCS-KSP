@@ -36,8 +36,10 @@ namespace FlightHUD
             {
                 if (deg == 0) continue;
 
-                float yOffset = (deg - pitch) * pixelsPerDegree;
-                float y = screenCenterY - yOffset;
+                // Positive pitch = nose up = horizon moves down on screen
+                // So +10 line should be above center (lower Y) when level
+                float yOffset = (pitch - deg) * pixelsPerDegree;
+                float y = screenCenterY + yOffset;
 
                 if (y < 50 || y > Screen.height - 50) continue;
 
@@ -56,7 +58,7 @@ namespace FlightHUD
                     GL.Vertex3(screenCenterX + gapWidth, y, 0);
                     GL.Vertex3(screenCenterX + width, y, 0);
 
-                    // End caps pointing up
+                    // End caps pointing down toward horizon
                     GL.Vertex3(screenCenterX - width, y, 0);
                     GL.Vertex3(screenCenterX - width, y + 8 * scale, 0);
                     GL.Vertex3(screenCenterX + width, y, 0);
@@ -77,7 +79,7 @@ namespace FlightHUD
                         GL.Vertex3(Mathf.Min(x + dashLen, screenCenterX + width), y, 0);
                     }
 
-                    // End caps pointing down
+                    // End caps pointing up toward horizon
                     GL.Vertex3(screenCenterX - width, y, 0);
                     GL.Vertex3(screenCenterX - width, y - 8 * scale, 0);
                     GL.Vertex3(screenCenterX + width, y, 0);
