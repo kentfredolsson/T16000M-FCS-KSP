@@ -1,13 +1,13 @@
 using System;
 using UnityEngine;
 
-namespace T16000M_FCS
+namespace FlightHUD
 {
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public class FlightHUD : MonoBehaviour
     {
         // Configuration reference
-        private Config config;
+        private HUDConfig config;
 
         // Rendering
         private Material lineMaterial;
@@ -30,7 +30,7 @@ namespace T16000M_FCS
 
         public void Start()
         {
-            config = Config.Load();
+            config = HUDConfig.Load();
             CreateLineMaterial();
 
             GameEvents.onVesselChange.Add(OnVesselChange);
@@ -40,7 +40,7 @@ namespace T16000M_FCS
                 vessel = FlightGlobals.ActiveVessel;
             }
 
-            Debug.Log("[T16000M_FCS] HUD Started - Press " + config.HUDKey + " to toggle");
+            Debug.Log("[FlightHUD] Started - Press " + config.HUDKey + " to toggle");
         }
 
         public void OnDestroy()
@@ -59,7 +59,6 @@ namespace T16000M_FCS
 
         private void CreateLineMaterial()
         {
-            // Unity's built-in shader for colored lines
             Shader shader = Shader.Find("Hidden/Internal-Colored");
             lineMaterial = new Material(shader);
             lineMaterial.hideFlags = HideFlags.HideAndDontSave;
@@ -71,16 +70,14 @@ namespace T16000M_FCS
 
         public void Update()
         {
-            // Toggle HUD
             if (Input.GetKeyDown(config.HUDKey))
             {
                 showHUD = !showHUD;
                 ScreenMessages.PostScreenMessage(
-                    "HUD: " + (showHUD ? "ON" : "OFF"),
+                    "Flight HUD: " + (showHUD ? "ON" : "OFF"),
                     2f, ScreenMessageStyle.UPPER_CENTER);
             }
 
-            // Update vessel reference
             if (vessel == null || vessel != FlightGlobals.ActiveVessel)
             {
                 vessel = FlightGlobals.ActiveVessel;
@@ -91,26 +88,20 @@ namespace T16000M_FCS
         {
             if (!showHUD || vessel == null || !config.HUDEnabled) return;
             if (!HighLogic.LoadedSceneIsFlight) return;
-
-            // Don't show in map view
             if (MapView.MapIsEnabled) return;
 
-            // Initialize styles if needed
             if (labelStyle == null)
             {
                 InitStyles();
             }
 
-            // Update screen metrics
             screenCenterX = Screen.width / 2f;
             screenCenterY = Screen.height / 2f;
             pixelsPerDegree = Screen.height / (Camera.main != null ? Camera.main.fieldOfView : 60f);
 
-            // Update colors from config
             hudColor = new Color(config.HUDColorR, config.HUDColorG, config.HUDColorB, config.HUDOpacity);
             hudColorDim = new Color(config.HUDColorR, config.HUDColorG, config.HUDColorB, config.HUDOpacity * 0.6f);
 
-            // Draw all HUD elements
             DrawHUD();
         }
 
@@ -130,7 +121,6 @@ namespace T16000M_FCS
 
         private void DrawHUD()
         {
-            // Get flight data
             float pitch = GetPitch();
             float roll = GetRoll();
             float heading = GetHeading();
@@ -140,17 +130,14 @@ namespace T16000M_FCS
             float vertSpeed = (float)vessel.verticalSpeed;
             float gForce = (float)vessel.geeForce;
             float aoa = GetAOA();
-            float mach = airspeed / 343f; // Approximate speed of sound
+            float mach = airspeed / 343f;
 
-            // Calculate flight path vector position
             Vector2 fpvOffset = GetFlightPathVectorOffset();
 
-            // Begin GL drawing
             GL.PushMatrix();
             lineMaterial.SetPass(0);
             GL.LoadPixelMatrix();
 
-            // Draw elements (order matters for layering)
             DrawBankIndicator(roll);
             DrawPitchLadder(pitch, roll);
             DrawAircraftSymbol();
@@ -162,22 +149,15 @@ namespace T16000M_FCS
 
             GL.PopMatrix();
 
-            // Draw text labels (after GL drawing)
             DrawTextLabels(airspeed, altitude, radarAlt, vertSpeed, gForce, aoa, heading, mach);
         }
-
-        // ============================================
-        // Flight Data Calculations
-        // ============================================
 
         private float GetPitch()
         {
             if (vessel == null) return 0f;
             Vector3 up = (vessel.CoMD - vessel.mainBody.position).normalized;
-            Vector3 forward = vessel.transform.up; // In KSP, transform.up is forward
-            Vector3 right = vessel.transform.right;
+            Vector3 forward = vessel.transform.up;
 
-            // Project forward onto horizontal plane
             Vector3 forwardHoriz = Vector3.ProjectOnPlane(forward, up).normalized;
             float pitch = Vector3.Angle(forwardHoriz, forward);
             if (Vector3.Dot(forward, up) < 0) pitch = -pitch;
@@ -191,7 +171,6 @@ namespace T16000M_FCS
             Vector3 up = (vessel.CoMD - vessel.mainBody.position).normalized;
             Vector3 right = vessel.transform.right;
 
-            // Project vessel right onto plane perpendicular to up
             Vector3 rightHoriz = Vector3.ProjectOnPlane(right, up).normalized;
             float roll = Vector3.SignedAngle(rightHoriz, right, vessel.transform.up);
 
@@ -229,23 +208,17 @@ namespace T16000M_FCS
         {
             if (vessel == null || vessel.srfSpeed < 5) return Vector2.zero;
 
-            // Get velocity in camera space
             Camera cam = Camera.main;
             if (cam == null) return Vector2.zero;
 
             Vector3 velocityWorld = vessel.srf_velocity.normalized;
             Vector3 velocityCam = cam.transform.InverseTransformDirection(velocityWorld);
 
-            // Convert to screen offset in degrees
             float offsetX = Mathf.Atan2(velocityCam.x, velocityCam.z) * Mathf.Rad2Deg;
             float offsetY = Mathf.Atan2(velocityCam.y, velocityCam.z) * Mathf.Rad2Deg;
 
             return new Vector2(offsetX, offsetY);
         }
-
-        // ============================================
-        // Drawing Methods
-        // ============================================
 
         private void DrawPitchLadder(float pitch, float roll)
         {
@@ -253,7 +226,6 @@ namespace T16000M_FCS
             float ladderWidth = 120f * scale;
             float gapWidth = 40f * scale;
 
-            // Save matrix and apply rotation for roll
             GL.PushMatrix();
             Matrix4x4 rotMatrix = Matrix4x4.TRS(
                 new Vector3(screenCenterX, screenCenterY, 0),
@@ -261,15 +233,13 @@ namespace T16000M_FCS
                 Vector3.one);
             GL.MultMatrix(rotMatrix * Matrix4x4.TRS(new Vector3(-screenCenterX, -screenCenterY, 0), Quaternion.identity, Vector3.one));
 
-            // Draw pitch lines from -90 to +90 in 5 degree increments
             for (int deg = -90; deg <= 90; deg += 5)
             {
-                if (deg == 0) continue; // Horizon line handled separately
+                if (deg == 0) continue;
 
                 float yOffset = (deg - pitch) * pixelsPerDegree;
                 float y = screenCenterY - yOffset;
 
-                // Only draw if on screen
                 if (y < 50 || y > Screen.height - 50) continue;
 
                 bool isMajor = (deg % 10 == 0);
@@ -281,13 +251,11 @@ namespace T16000M_FCS
 
                 if (deg > 0)
                 {
-                    // Above horizon - solid lines
                     GL.Vertex3(screenCenterX - width, y, 0);
                     GL.Vertex3(screenCenterX - gapWidth, y, 0);
                     GL.Vertex3(screenCenterX + gapWidth, y, 0);
                     GL.Vertex3(screenCenterX + width, y, 0);
 
-                    // End caps pointing down
                     GL.Vertex3(screenCenterX - width, y, 0);
                     GL.Vertex3(screenCenterX - width, y + 8 * scale, 0);
                     GL.Vertex3(screenCenterX + width, y, 0);
@@ -295,7 +263,6 @@ namespace T16000M_FCS
                 }
                 else
                 {
-                    // Below horizon - dashed lines
                     float dashLen = 8f * scale;
                     for (float x = screenCenterX - width; x < screenCenterX - gapWidth; x += dashLen * 2)
                     {
@@ -308,7 +275,6 @@ namespace T16000M_FCS
                         GL.Vertex3(Mathf.Min(x + dashLen, screenCenterX + width), y, 0);
                     }
 
-                    // End caps pointing up
                     GL.Vertex3(screenCenterX - width, y, 0);
                     GL.Vertex3(screenCenterX - width, y - 8 * scale, 0);
                     GL.Vertex3(screenCenterX + width, y, 0);
@@ -318,7 +284,6 @@ namespace T16000M_FCS
                 GL.End();
             }
 
-            // Draw horizon line
             float horizonY = screenCenterY + pitch * pixelsPerDegree;
             if (horizonY > 50 && horizonY < Screen.height - 50)
             {
@@ -343,26 +308,20 @@ namespace T16000M_FCS
             GL.Begin(GL.LINES);
             GL.Color(hudColor);
 
-            // W-shape aircraft symbol
-            // Left wing
             GL.Vertex3(cx - 30 * scale, cy, 0);
             GL.Vertex3(cx - 8 * scale, cy, 0);
 
-            // Left dip
             GL.Vertex3(cx - 8 * scale, cy, 0);
             GL.Vertex3(cx - 4 * scale, cy + 6 * scale, 0);
 
-            // Center
             GL.Vertex3(cx - 4 * scale, cy + 6 * scale, 0);
             GL.Vertex3(cx, cy, 0);
             GL.Vertex3(cx, cy, 0);
             GL.Vertex3(cx + 4 * scale, cy + 6 * scale, 0);
 
-            // Right dip
             GL.Vertex3(cx + 4 * scale, cy + 6 * scale, 0);
             GL.Vertex3(cx + 8 * scale, cy, 0);
 
-            // Right wing
             GL.Vertex3(cx + 8 * scale, cy, 0);
             GL.Vertex3(cx + 30 * scale, cy, 0);
 
@@ -376,7 +335,6 @@ namespace T16000M_FCS
             float cy = screenCenterY - offset.y * pixelsPerDegree;
             float radius = 8 * scale;
 
-            // Clamp to screen bounds
             float margin = 100 * scale;
             cx = Mathf.Clamp(cx, margin, Screen.width - margin);
             cy = Mathf.Clamp(cy, margin, Screen.height - margin);
@@ -384,7 +342,6 @@ namespace T16000M_FCS
             GL.Begin(GL.LINES);
             GL.Color(hudColor);
 
-            // Draw circle
             int segments = 16;
             for (int i = 0; i < segments; i++)
             {
@@ -395,15 +352,12 @@ namespace T16000M_FCS
                 GL.Vertex3(cx + Mathf.Cos(angle2) * radius, cy + Mathf.Sin(angle2) * radius, 0);
             }
 
-            // Left wing
             GL.Vertex3(cx - radius, cy, 0);
             GL.Vertex3(cx - radius - 15 * scale, cy, 0);
 
-            // Right wing
             GL.Vertex3(cx + radius, cy, 0);
             GL.Vertex3(cx + radius + 15 * scale, cy, 0);
 
-            // Top fin
             GL.Vertex3(cx, cy - radius, 0);
             GL.Vertex3(cx, cy - radius - 10 * scale, 0);
 
@@ -419,7 +373,6 @@ namespace T16000M_FCS
             GL.Begin(GL.LINES);
             GL.Color(hudColor);
 
-            // Draw arc from -60 to +60 degrees
             int[] tickDegrees = { -60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60 };
 
             foreach (int deg in tickDegrees)
@@ -436,7 +389,6 @@ namespace T16000M_FCS
                 GL.Vertex3(x2, y2, 0);
             }
 
-            // Draw arc segments
             for (int i = -60; i < 60; i += 5)
             {
                 float angle1 = (90 + i) * Mathf.Deg2Rad;
@@ -448,7 +400,6 @@ namespace T16000M_FCS
 
             GL.End();
 
-            // Draw roll pointer (triangle)
             float pointerAngle = (90 - roll) * Mathf.Deg2Rad;
             float px = screenCenterX + Mathf.Cos(pointerAngle) * (radius + 5 * scale);
             float py = cy + Mathf.Sin(pointerAngle) * (radius + 5 * scale);
@@ -472,12 +423,11 @@ namespace T16000M_FCS
             float tapeWidth = 300 * scale;
             float tapeY = 50 * scale;
             float tickHeight = 10 * scale;
-            float pixelsPerHeadingDeg = tapeWidth / 60f; // Show 60 degrees of heading
+            float pixelsPerHeadingDeg = tapeWidth / 60f;
 
             GL.Begin(GL.LINES);
             GL.Color(hudColor);
 
-            // Draw heading tape box
             float boxLeft = screenCenterX - tapeWidth / 2;
             float boxRight = screenCenterX + tapeWidth / 2;
             GL.Vertex3(boxLeft, tapeY, 0);
@@ -485,11 +435,9 @@ namespace T16000M_FCS
             GL.Vertex3(boxLeft, tapeY + tickHeight * 2, 0);
             GL.Vertex3(boxRight, tapeY + tickHeight * 2, 0);
 
-            // Center tick
             GL.Vertex3(screenCenterX, tapeY + tickHeight * 2, 0);
             GL.Vertex3(screenCenterX, tapeY + tickHeight * 2 + 8 * scale, 0);
 
-            // Draw heading ticks
             int startDeg = Mathf.FloorToInt(heading / 5) * 5 - 30;
             for (int deg = startDeg; deg <= startDeg + 60; deg += 5)
             {
@@ -524,7 +472,6 @@ namespace T16000M_FCS
             GL.Begin(GL.LINES);
             GL.Color(hudColor);
 
-            // Tape outline
             GL.Vertex3(tapeX, top, 0);
             GL.Vertex3(tapeX, bottom, 0);
             GL.Vertex3(tapeX, top, 0);
@@ -532,14 +479,12 @@ namespace T16000M_FCS
             GL.Vertex3(tapeX, bottom, 0);
             GL.Vertex3(tapeX + tapeWidth, bottom, 0);
 
-            // Current value pointer
             GL.Vertex3(tapeX + tapeWidth, cy - 8 * scale, 0);
             GL.Vertex3(tapeX + tapeWidth + 15 * scale, cy, 0);
             GL.Vertex3(tapeX + tapeWidth + 15 * scale, cy, 0);
             GL.Vertex3(tapeX + tapeWidth, cy + 8 * scale, 0);
 
-            // Draw ticks
-            float pixelsPerUnit = tapeHeight / 100f; // Show 100 m/s range
+            float pixelsPerUnit = tapeHeight / 100f;
             int startVal = Mathf.FloorToInt((airspeed - 50) / 10) * 10;
 
             for (int val = startVal; val <= startVal + 100; val += 10)
@@ -575,7 +520,6 @@ namespace T16000M_FCS
             GL.Begin(GL.LINES);
             GL.Color(hudColor);
 
-            // Tape outline
             GL.Vertex3(tapeX, top, 0);
             GL.Vertex3(tapeX, bottom, 0);
             GL.Vertex3(tapeX - tapeWidth, top, 0);
@@ -583,13 +527,11 @@ namespace T16000M_FCS
             GL.Vertex3(tapeX - tapeWidth, bottom, 0);
             GL.Vertex3(tapeX, bottom, 0);
 
-            // Current value pointer
             GL.Vertex3(tapeX - tapeWidth, cy - 8 * scale, 0);
             GL.Vertex3(tapeX - tapeWidth - 15 * scale, cy, 0);
             GL.Vertex3(tapeX - tapeWidth - 15 * scale, cy, 0);
             GL.Vertex3(tapeX - tapeWidth, cy + 8 * scale, 0);
 
-            // Determine scale based on altitude
             float range, increment;
             if (altitude < 1000)
             {
@@ -638,16 +580,13 @@ namespace T16000M_FCS
             GL.Begin(GL.LINES);
             GL.Color(hudColor);
 
-            // Vertical line
             GL.Vertex3(x, cy - height, 0);
             GL.Vertex3(x, cy + height, 0);
 
-            // Zero mark
             GL.Vertex3(x - 5 * scale, cy, 0);
             GL.Vertex3(x + 5 * scale, cy, 0);
 
-            // Ticks at intervals
-            float maxVS = 100f; // m/s scale
+            float maxVS = 100f;
             float[] ticks = { -100, -50, 50, 100 };
             foreach (float vs in ticks)
             {
@@ -656,11 +595,9 @@ namespace T16000M_FCS
                 GL.Vertex3(x + 3 * scale, y, 0);
             }
 
-            // Current VS indicator (clamped)
             float clampedVS = Mathf.Clamp(vertSpeed, -maxVS, maxVS);
             float indicatorY = cy - (clampedVS / maxVS) * height;
 
-            // Draw filled triangle
             GL.End();
             GL.Begin(GL.TRIANGLES);
             GL.Color(hudColor);
@@ -675,22 +612,18 @@ namespace T16000M_FCS
         {
             float scale = config.HUDScale;
 
-            // Update label style colors
             labelStyle.normal.textColor = hudColor;
             labelStyleSmall.normal.textColor = hudColor;
             labelStyleCenter.normal.textColor = hudColor;
 
-            // Airspeed value
             string speedStr = airspeed.ToString("F0");
             GUI.Label(new Rect(80 * scale, screenCenterY - 10, 60, 25), speedStr, labelStyle);
 
-            // Mach number (if supersonic)
             if (mach > 0.8f)
             {
                 GUI.Label(new Rect(80 * scale, screenCenterY + 15, 60, 20), "M" + mach.ToString("F2"), labelStyleSmall);
             }
 
-            // Altitude value
             string altStr;
             if (altitude >= 10000)
                 altStr = (altitude / 1000f).ToString("F1") + "k";
@@ -698,33 +631,26 @@ namespace T16000M_FCS
                 altStr = altitude.ToString("F0");
             GUI.Label(new Rect(Screen.width - 140 * scale, screenCenterY - 10, 60, 25), altStr, labelStyle);
 
-            // Radar altitude (if low)
             if (radarAlt < 1000 && radarAlt > 0)
             {
                 GUI.Label(new Rect(Screen.width - 140 * scale, screenCenterY + 15, 60, 20),
                     "R" + radarAlt.ToString("F0"), labelStyleSmall);
             }
 
-            // Vertical speed
             string vsStr = (vertSpeed >= 0 ? "+" : "") + vertSpeed.ToString("F0");
             GUI.Label(new Rect(Screen.width - 55 * scale, screenCenterY - 10, 50, 25), vsStr, labelStyleSmall);
 
-            // Heading value (center box)
             string hdgStr = heading.ToString("F0").PadLeft(3, '0');
             GUI.Label(new Rect(screenCenterX - 20, 55 * scale, 40, 25), hdgStr, labelStyleCenter);
 
-            // Heading cardinal directions
             DrawHeadingLabels(heading, scale);
 
-            // G-force
             GUI.Label(new Rect(screenCenterX - 80 * scale, Screen.height - 60 * scale, 60, 25),
                 "G " + gForce.ToString("F1"), labelStyle);
 
-            // AOA
             GUI.Label(new Rect(screenCenterX + 30 * scale, Screen.height - 60 * scale, 60, 25),
-                "AOA " + aoa.ToString("F1") + "°", labelStyle);
+                "AOA " + aoa.ToString("F1") + "\u00B0", labelStyle);
 
-            // Pitch ladder degree labels
             DrawPitchLabels(scale);
         }
 
@@ -748,7 +674,6 @@ namespace T16000M_FCS
                 }
             }
 
-            // Numeric labels every 30 degrees
             int startDeg = Mathf.FloorToInt(heading / 30) * 30 - 30;
             for (int deg = startDeg; deg <= startDeg + 90; deg += 30)
             {
@@ -771,7 +696,6 @@ namespace T16000M_FCS
             float roll = GetRoll();
             float ladderWidth = 120f * scale;
 
-            // Draw degree labels next to pitch ladder lines
             for (int deg = -90; deg <= 90; deg += 10)
             {
                 if (deg == 0) continue;
@@ -781,11 +705,9 @@ namespace T16000M_FCS
 
                 if (y < 80 || y > Screen.height - 80) continue;
 
-                // Apply roll rotation to label position
                 float labelX = screenCenterX + ladderWidth + 10 * scale;
                 float labelY = y - 8;
 
-                // Rotate around screen center
                 float dx = labelX - screenCenterX;
                 float dy = labelY - screenCenterY;
                 float rollRad = -roll * Mathf.Deg2Rad;

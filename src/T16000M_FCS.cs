@@ -310,7 +310,7 @@ namespace T16000M_FCS
 
             // Status
             GUILayout.Label("Status: " + (isEnabled ? "<color=green>ENABLED</color>" : "<color=red>DISABLED</color>"));
-            GUILayout.Label("Toggle: " + config.ToggleKey + " | GUI: " + config.GUIKey + " | HUD: " + config.HUDKey);
+            GUILayout.Label("Toggle: " + config.ToggleKey + " | GUI: " + config.GUIKey);
 
             GUILayout.Space(10);
 
