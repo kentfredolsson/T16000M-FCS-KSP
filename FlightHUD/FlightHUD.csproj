@@ -54,12 +54,21 @@
       <HintPath>$(KSPManagedPath)/UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(KSPManagedPath)/UnityEngine.AnimationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(KSPManagedPath)/UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
-  <!-- Copy DLL to GameData after build -->
+  <!-- Copy DLL and assets to GameData after build -->
   <Target Name="CopyToGameData" AfterTargets="Build">
     <MakeDir Directories="$(GameDataPath)" Condition="!Exists('$(GameDataPath)')" />
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(GameDataPath)" />
+    <Copy SourceFiles="assets\icon_toolbar.png" DestinationFolder="$(GameDataPath)" Condition="Exists('assets\icon_toolbar.png')" />
     <Message Text="Copied $(AssemblyName).dll to $(GameDataPath)" Importance="high" />
   </Target>
 

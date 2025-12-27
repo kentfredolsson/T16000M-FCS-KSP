@@ -4,33 +4,28 @@ using UnityEngine;
 namespace FlightHUD
 {
     [KSPAddon(KSPAddon.Startup.Flight, false)]
-    public class FlightHUD : MonoBehaviour
+    public class FlightHUDMain : MonoBehaviour
     {
-        // Configuration reference
-        private HUDConfig config;
+        public static FlightHUDMain Instance { get; private set; }
+        public static HUDConfig Config { get; private set; }
+        public static bool ShowSettingsGUI { get; set; }
 
-        // Rendering
         private Material lineMaterial;
         private GUIStyle labelStyle;
         private GUIStyle labelStyleSmall;
         private GUIStyle labelStyleCenter;
 
-        // State
-        private bool showHUD = true;
         private Vessel vessel;
-
-        // Screen metrics
         private float screenCenterX;
         private float screenCenterY;
         private float pixelsPerDegree;
 
-        // HUD colors
-        private Color hudColor;
-        private Color hudColorDim;
+        private FlightData flightData;
 
         public void Start()
         {
-            config = HUDConfig.Load();
+            Instance = this;
+            Config = HUDConfig.Load();
             CreateLineMaterial();
 
             GameEvents.onVesselChange.Add(OnVesselChange);
@@ -40,7 +35,7 @@ namespace FlightHUD
                 vessel = FlightGlobals.ActiveVessel;
             }
 
-            Debug.Log("[FlightHUD] Started - Press " + config.HUDKey + " to toggle");
+            Debug.Log("[FlightHUD] Started - Press " + Config.HUDToggleKey + " to toggle, use toolbar button for settings");
         }
 
         public void OnDestroy()
@@ -50,6 +45,7 @@ namespace FlightHUD
             {
                 Destroy(lineMaterial);
             }
+            Instance = null;
         }
 
         private void OnVesselChange(Vessel newVessel)
@@ -70,11 +66,11 @@ namespace FlightHUD
 
         public void Update()
         {
-            if (Input.GetKeyDown(config.HUDKey))
+            if (Input.GetKeyDown(Config.HUDToggleKey))
             {
-                showHUD = !showHUD;
+                Config.HUDEnabled = !Config.HUDEnabled;
                 ScreenMessages.PostScreenMessage(
-                    "Flight HUD: " + (showHUD ? "ON" : "OFF"),
+                    "Flight HUD: " + (Config.HUDEnabled ? "ON" : "OFF"),
                     2f, ScreenMessageStyle.UPPER_CENTER);
             }
 
@@ -82,11 +78,76 @@ namespace FlightHUD
             {
                 vessel = FlightGlobals.ActiveVessel;
             }
+
+            if (vessel != null && Config.HUDEnabled)
+            {
+                UpdateFlightData();
+            }
+        }
+
+        private void UpdateFlightData()
+        {
+            Vector3 up = (vessel.CoMD - vessel.mainBody.position).normalized;
+            Vector3 north = Vector3.ProjectOnPlane(vessel.mainBody.transform.up, up).normalized;
+            Vector3 forward = vessel.transform.up;
+
+            // Pitch
+            Vector3 forwardHoriz = Vector3.ProjectOnPlane(forward, up).normalized;
+            flightData.Pitch = Vector3.Angle(forwardHoriz, forward);
+            if (Vector3.Dot(forward, up) < 0) flightData.Pitch = -flightData.Pitch;
+
+            // Roll
+            Vector3 right = vessel.transform.right;
+            Vector3 rightHoriz = Vector3.ProjectOnPlane(right, up).normalized;
+            flightData.Roll = Vector3.SignedAngle(rightHoriz, right, forward);
+
+            // Heading
+            flightData.Heading = Vector3.SignedAngle(north, forwardHoriz, up);
+            if (flightData.Heading < 0) flightData.Heading += 360f;
+
+            // Flight Path Vector
+            if (vessel.srfSpeed > 5)
+            {
+                Camera cam = Camera.main;
+                if (cam != null)
+                {
+                    Vector3 velocityWorld = vessel.srf_velocity.normalized;
+                    Vector3 velocityCam = cam.transform.InverseTransformDirection(velocityWorld);
+                    flightData.FPVOffset = new Vector2(
+                        Mathf.Atan2(velocityCam.x, velocityCam.z) * Mathf.Rad2Deg,
+                        Mathf.Atan2(velocityCam.y, velocityCam.z) * Mathf.Rad2Deg);
+                }
+            }
+            else
+            {
+                flightData.FPVOffset = Vector2.zero;
+            }
+
+            // AOA
+            if (vessel.srfSpeed > 1)
+            {
+                Vector3 velocity = vessel.srf_velocity.normalized;
+                flightData.AOA = Vector3.Angle(velocity, forward);
+                Vector3 cross = Vector3.Cross(velocity, forward);
+                if (Vector3.Dot(cross, vessel.transform.right) < 0) flightData.AOA = -flightData.AOA;
+            }
+            else
+            {
+                flightData.AOA = 0f;
+            }
+
+            // Basic telemetry
+            flightData.Airspeed = (float)vessel.srfSpeed;
+            flightData.Altitude = (float)vessel.altitude;
+            flightData.RadarAltitude = vessel.heightFromTerrain > 0 ? (float)vessel.heightFromTerrain : flightData.Altitude;
+            flightData.VerticalSpeed = (float)vessel.verticalSpeed;
+            flightData.GForce = (float)vessel.geeForce;
+            flightData.Mach = flightData.Airspeed / 343f;
         }
 
         public void OnGUI()
         {
-            if (!showHUD || vessel == null || !config.HUDEnabled) return;
+            if (!Config.HUDEnabled || vessel == null) return;
             if (!HighLogic.LoadedSceneIsFlight) return;
             if (MapView.MapIsEnabled) return;
 
@@ -99,562 +160,139 @@ namespace FlightHUD
             screenCenterY = Screen.height / 2f;
             pixelsPerDegree = Screen.height / (Camera.main != null ? Camera.main.fieldOfView : 60f);
 
-            hudColor = new Color(config.HUDColorR, config.HUDColorG, config.HUDColorB, config.HUDOpacity);
-            hudColorDim = new Color(config.HUDColorR, config.HUDColorG, config.HUDColorB, config.HUDOpacity * 0.6f);
-
-            DrawHUD();
-        }
-
-        private void InitStyles()
-        {
-            labelStyle = new GUIStyle(GUI.skin.label);
-            labelStyle.normal.textColor = hudColor;
-            labelStyle.fontSize = (int)(14 * config.HUDScale);
-            labelStyle.fontStyle = FontStyle.Bold;
-
-            labelStyleSmall = new GUIStyle(labelStyle);
-            labelStyleSmall.fontSize = (int)(11 * config.HUDScale);
-
-            labelStyleCenter = new GUIStyle(labelStyle);
-            labelStyleCenter.alignment = TextAnchor.MiddleCenter;
-        }
-
-        private void DrawHUD()
-        {
-            float pitch = GetPitch();
-            float roll = GetRoll();
-            float heading = GetHeading();
-            float airspeed = (float)vessel.srfSpeed;
-            float altitude = (float)vessel.altitude;
-            float radarAlt = vessel.heightFromTerrain > 0 ? (float)vessel.heightFromTerrain : altitude;
-            float vertSpeed = (float)vessel.verticalSpeed;
-            float gForce = (float)vessel.geeForce;
-            float aoa = GetAOA();
-            float mach = airspeed / 343f;
-
-            Vector2 fpvOffset = GetFlightPathVectorOffset();
+            Color hudColor = Config.GetHUDColor();
+            Color hudColorDim = Config.GetHUDColorDim();
+            float scale = Config.HUDScale;
 
             GL.PushMatrix();
             lineMaterial.SetPass(0);
             GL.LoadPixelMatrix();
 
-            DrawBankIndicator(roll);
-            DrawPitchLadder(pitch, roll);
-            DrawAircraftSymbol();
-            DrawFlightPathVector(fpvOffset);
-            DrawHeadingTape(heading);
-            DrawAirspeedTape(airspeed, mach);
-            DrawAltitudeTape(altitude, radarAlt);
-            DrawVerticalSpeedIndicator(vertSpeed);
+            if (Config.ShowBankIndicator)
+                HUDElements.DrawBankIndicator(flightData.Roll, screenCenterX, screenCenterY, scale, hudColor);
+
+            if (Config.ShowPitchLadder)
+                HUDElements.DrawPitchLadder(flightData.Pitch, flightData.Roll, screenCenterX, screenCenterY, pixelsPerDegree, scale, hudColor, hudColorDim);
+
+            if (Config.ShowAircraftSymbol)
+                HUDElements.DrawAircraftSymbol(screenCenterX, screenCenterY, scale, hudColor);
+
+            if (Config.ShowFlightPathVector)
+                HUDElements.DrawFlightPathVector(flightData.FPVOffset, screenCenterX, screenCenterY, pixelsPerDegree, scale, hudColor);
+
+            if (Config.ShowHeadingTape)
+                HUDElements.DrawHeadingTape(flightData.Heading, screenCenterX, scale, hudColor);
+
+            if (Config.ShowAirspeedTape)
+                HUDElements.DrawAirspeedTape(flightData.Airspeed, screenCenterY, scale, hudColor);
+
+            if (Config.ShowAltitudeTape)
+                HUDElements.DrawAltitudeTape(flightData.Altitude, flightData.RadarAltitude, screenCenterY, scale, hudColor);
+
+            if (Config.ShowVSI)
+                HUDElements.DrawVerticalSpeedIndicator(flightData.VerticalSpeed, screenCenterY, scale, hudColor);
+
+            if (Config.ShowCompassRose)
+                HUDElements.DrawCompassRose(flightData.Heading, screenCenterX, scale, hudColor);
 
             GL.PopMatrix();
 
-            DrawTextLabels(airspeed, altitude, radarAlt, vertSpeed, gForce, aoa, heading, mach);
+            DrawTextLabels(hudColor);
         }
 
-        private float GetPitch()
+        private void InitStyles()
         {
-            if (vessel == null) return 0f;
-            Vector3 up = (vessel.CoMD - vessel.mainBody.position).normalized;
-            Vector3 forward = vessel.transform.up;
+            Color hudColor = Config.GetHUDColor();
 
-            Vector3 forwardHoriz = Vector3.ProjectOnPlane(forward, up).normalized;
-            float pitch = Vector3.Angle(forwardHoriz, forward);
-            if (Vector3.Dot(forward, up) < 0) pitch = -pitch;
+            labelStyle = new GUIStyle(GUI.skin.label);
+            labelStyle.normal.textColor = hudColor;
+            labelStyle.fontSize = (int)(14 * Config.HUDScale);
+            labelStyle.fontStyle = FontStyle.Bold;
 
-            return pitch;
+            labelStyleSmall = new GUIStyle(labelStyle);
+            labelStyleSmall.fontSize = (int)(11 * Config.HUDScale);
+
+            labelStyleCenter = new GUIStyle(labelStyle);
+            labelStyleCenter.alignment = TextAnchor.MiddleCenter;
         }
 
-        private float GetRoll()
+        private void DrawTextLabels(Color hudColor)
         {
-            if (vessel == null) return 0f;
-            Vector3 up = (vessel.CoMD - vessel.mainBody.position).normalized;
-            Vector3 right = vessel.transform.right;
-
-            Vector3 rightHoriz = Vector3.ProjectOnPlane(right, up).normalized;
-            float roll = Vector3.SignedAngle(rightHoriz, right, vessel.transform.up);
-
-            return roll;
-        }
-
-        private float GetHeading()
-        {
-            if (vessel == null) return 0f;
-            Vector3 up = (vessel.CoMD - vessel.mainBody.position).normalized;
-            Vector3 north = Vector3.ProjectOnPlane(vessel.mainBody.transform.up, up).normalized;
-            Vector3 forward = Vector3.ProjectOnPlane(vessel.transform.up, up).normalized;
-
-            float heading = Vector3.SignedAngle(north, forward, up);
-            if (heading < 0) heading += 360f;
-
-            return heading;
-        }
-
-        private float GetAOA()
-        {
-            if (vessel == null || vessel.srfSpeed < 1) return 0f;
-
-            Vector3 velocity = vessel.srf_velocity.normalized;
-            Vector3 forward = vessel.transform.up;
-
-            float aoa = Vector3.Angle(velocity, forward);
-            Vector3 cross = Vector3.Cross(velocity, forward);
-            if (Vector3.Dot(cross, vessel.transform.right) < 0) aoa = -aoa;
-
-            return aoa;
-        }
-
-        private Vector2 GetFlightPathVectorOffset()
-        {
-            if (vessel == null || vessel.srfSpeed < 5) return Vector2.zero;
-
-            Camera cam = Camera.main;
-            if (cam == null) return Vector2.zero;
-
-            Vector3 velocityWorld = vessel.srf_velocity.normalized;
-            Vector3 velocityCam = cam.transform.InverseTransformDirection(velocityWorld);
-
-            float offsetX = Mathf.Atan2(velocityCam.x, velocityCam.z) * Mathf.Rad2Deg;
-            float offsetY = Mathf.Atan2(velocityCam.y, velocityCam.z) * Mathf.Rad2Deg;
-
-            return new Vector2(offsetX, offsetY);
-        }
-
-        private void DrawPitchLadder(float pitch, float roll)
-        {
-            float scale = config.HUDScale;
-            float ladderWidth = 120f * scale;
-            float gapWidth = 40f * scale;
-
-            GL.PushMatrix();
-            Matrix4x4 rotMatrix = Matrix4x4.TRS(
-                new Vector3(screenCenterX, screenCenterY, 0),
-                Quaternion.Euler(0, 0, roll),
-                Vector3.one);
-            GL.MultMatrix(rotMatrix * Matrix4x4.TRS(new Vector3(-screenCenterX, -screenCenterY, 0), Quaternion.identity, Vector3.one));
-
-            for (int deg = -90; deg <= 90; deg += 5)
-            {
-                if (deg == 0) continue;
-
-                float yOffset = (deg - pitch) * pixelsPerDegree;
-                float y = screenCenterY - yOffset;
-
-                if (y < 50 || y > Screen.height - 50) continue;
-
-                bool isMajor = (deg % 10 == 0);
-                float width = isMajor ? ladderWidth : ladderWidth * 0.6f;
-                Color color = isMajor ? hudColor : hudColorDim;
-
-                GL.Begin(GL.LINES);
-                GL.Color(color);
-
-                if (deg > 0)
-                {
-                    GL.Vertex3(screenCenterX - width, y, 0);
-                    GL.Vertex3(screenCenterX - gapWidth, y, 0);
-                    GL.Vertex3(screenCenterX + gapWidth, y, 0);
-                    GL.Vertex3(screenCenterX + width, y, 0);
-
-                    GL.Vertex3(screenCenterX - width, y, 0);
-                    GL.Vertex3(screenCenterX - width, y + 8 * scale, 0);
-                    GL.Vertex3(screenCenterX + width, y, 0);
-                    GL.Vertex3(screenCenterX + width, y + 8 * scale, 0);
-                }
-                else
-                {
-                    float dashLen = 8f * scale;
-                    for (float x = screenCenterX - width; x < screenCenterX - gapWidth; x += dashLen * 2)
-                    {
-                        GL.Vertex3(x, y, 0);
-                        GL.Vertex3(Mathf.Min(x + dashLen, screenCenterX - gapWidth), y, 0);
-                    }
-                    for (float x = screenCenterX + gapWidth; x < screenCenterX + width; x += dashLen * 2)
-                    {
-                        GL.Vertex3(x, y, 0);
-                        GL.Vertex3(Mathf.Min(x + dashLen, screenCenterX + width), y, 0);
-                    }
-
-                    GL.Vertex3(screenCenterX - width, y, 0);
-                    GL.Vertex3(screenCenterX - width, y - 8 * scale, 0);
-                    GL.Vertex3(screenCenterX + width, y, 0);
-                    GL.Vertex3(screenCenterX + width, y - 8 * scale, 0);
-                }
-
-                GL.End();
-            }
-
-            float horizonY = screenCenterY + pitch * pixelsPerDegree;
-            if (horizonY > 50 && horizonY < Screen.height - 50)
-            {
-                GL.Begin(GL.LINES);
-                GL.Color(hudColor);
-                GL.Vertex3(screenCenterX - ladderWidth * 1.5f, horizonY, 0);
-                GL.Vertex3(screenCenterX - gapWidth, horizonY, 0);
-                GL.Vertex3(screenCenterX + gapWidth, horizonY, 0);
-                GL.Vertex3(screenCenterX + ladderWidth * 1.5f, horizonY, 0);
-                GL.End();
-            }
-
-            GL.PopMatrix();
-        }
-
-        private void DrawAircraftSymbol()
-        {
-            float scale = config.HUDScale;
-            float cx = screenCenterX;
-            float cy = screenCenterY;
-
-            GL.Begin(GL.LINES);
-            GL.Color(hudColor);
-
-            GL.Vertex3(cx - 30 * scale, cy, 0);
-            GL.Vertex3(cx - 8 * scale, cy, 0);
-
-            GL.Vertex3(cx - 8 * scale, cy, 0);
-            GL.Vertex3(cx - 4 * scale, cy + 6 * scale, 0);
-
-            GL.Vertex3(cx - 4 * scale, cy + 6 * scale, 0);
-            GL.Vertex3(cx, cy, 0);
-            GL.Vertex3(cx, cy, 0);
-            GL.Vertex3(cx + 4 * scale, cy + 6 * scale, 0);
-
-            GL.Vertex3(cx + 4 * scale, cy + 6 * scale, 0);
-            GL.Vertex3(cx + 8 * scale, cy, 0);
-
-            GL.Vertex3(cx + 8 * scale, cy, 0);
-            GL.Vertex3(cx + 30 * scale, cy, 0);
-
-            GL.End();
-        }
-
-        private void DrawFlightPathVector(Vector2 offset)
-        {
-            float scale = config.HUDScale;
-            float cx = screenCenterX + offset.x * pixelsPerDegree;
-            float cy = screenCenterY - offset.y * pixelsPerDegree;
-            float radius = 8 * scale;
-
-            float margin = 100 * scale;
-            cx = Mathf.Clamp(cx, margin, Screen.width - margin);
-            cy = Mathf.Clamp(cy, margin, Screen.height - margin);
-
-            GL.Begin(GL.LINES);
-            GL.Color(hudColor);
-
-            int segments = 16;
-            for (int i = 0; i < segments; i++)
-            {
-                float angle1 = (i / (float)segments) * Mathf.PI * 2;
-                float angle2 = ((i + 1) / (float)segments) * Mathf.PI * 2;
-
-                GL.Vertex3(cx + Mathf.Cos(angle1) * radius, cy + Mathf.Sin(angle1) * radius, 0);
-                GL.Vertex3(cx + Mathf.Cos(angle2) * radius, cy + Mathf.Sin(angle2) * radius, 0);
-            }
-
-            GL.Vertex3(cx - radius, cy, 0);
-            GL.Vertex3(cx - radius - 15 * scale, cy, 0);
-
-            GL.Vertex3(cx + radius, cy, 0);
-            GL.Vertex3(cx + radius + 15 * scale, cy, 0);
-
-            GL.Vertex3(cx, cy - radius, 0);
-            GL.Vertex3(cx, cy - radius - 10 * scale, 0);
-
-            GL.End();
-        }
-
-        private void DrawBankIndicator(float roll)
-        {
-            float scale = config.HUDScale;
-            float radius = 150 * scale;
-            float cy = screenCenterY - 120 * scale;
-
-            GL.Begin(GL.LINES);
-            GL.Color(hudColor);
-
-            int[] tickDegrees = { -60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60 };
-
-            foreach (int deg in tickDegrees)
-            {
-                float angle = (90 + deg) * Mathf.Deg2Rad;
-                float x1 = screenCenterX + Mathf.Cos(angle) * radius;
-                float y1 = cy + Mathf.Sin(angle) * radius;
-
-                float tickLen = (deg % 30 == 0) ? 15 * scale : (deg % 10 == 0 ? 10 * scale : 6 * scale);
-                float x2 = screenCenterX + Mathf.Cos(angle) * (radius - tickLen);
-                float y2 = cy + Mathf.Sin(angle) * (radius - tickLen);
-
-                GL.Vertex3(x1, y1, 0);
-                GL.Vertex3(x2, y2, 0);
-            }
-
-            for (int i = -60; i < 60; i += 5)
-            {
-                float angle1 = (90 + i) * Mathf.Deg2Rad;
-                float angle2 = (90 + i + 5) * Mathf.Deg2Rad;
-
-                GL.Vertex3(screenCenterX + Mathf.Cos(angle1) * radius, cy + Mathf.Sin(angle1) * radius, 0);
-                GL.Vertex3(screenCenterX + Mathf.Cos(angle2) * radius, cy + Mathf.Sin(angle2) * radius, 0);
-            }
-
-            GL.End();
-
-            float pointerAngle = (90 - roll) * Mathf.Deg2Rad;
-            float px = screenCenterX + Mathf.Cos(pointerAngle) * (radius + 5 * scale);
-            float py = cy + Mathf.Sin(pointerAngle) * (radius + 5 * scale);
-
-            GL.Begin(GL.TRIANGLES);
-            GL.Color(hudColor);
-
-            float triSize = 8 * scale;
-            float perpAngle = pointerAngle + Mathf.PI / 2;
-
-            GL.Vertex3(px + Mathf.Cos(pointerAngle) * triSize, py + Mathf.Sin(pointerAngle) * triSize, 0);
-            GL.Vertex3(px + Mathf.Cos(perpAngle) * triSize * 0.5f, py + Mathf.Sin(perpAngle) * triSize * 0.5f, 0);
-            GL.Vertex3(px - Mathf.Cos(perpAngle) * triSize * 0.5f, py - Mathf.Sin(perpAngle) * triSize * 0.5f, 0);
-
-            GL.End();
-        }
-
-        private void DrawHeadingTape(float heading)
-        {
-            float scale = config.HUDScale;
-            float tapeWidth = 300 * scale;
-            float tapeY = 50 * scale;
-            float tickHeight = 10 * scale;
-            float pixelsPerHeadingDeg = tapeWidth / 60f;
-
-            GL.Begin(GL.LINES);
-            GL.Color(hudColor);
-
-            float boxLeft = screenCenterX - tapeWidth / 2;
-            float boxRight = screenCenterX + tapeWidth / 2;
-            GL.Vertex3(boxLeft, tapeY, 0);
-            GL.Vertex3(boxRight, tapeY, 0);
-            GL.Vertex3(boxLeft, tapeY + tickHeight * 2, 0);
-            GL.Vertex3(boxRight, tapeY + tickHeight * 2, 0);
-
-            GL.Vertex3(screenCenterX, tapeY + tickHeight * 2, 0);
-            GL.Vertex3(screenCenterX, tapeY + tickHeight * 2 + 8 * scale, 0);
-
-            int startDeg = Mathf.FloorToInt(heading / 5) * 5 - 30;
-            for (int deg = startDeg; deg <= startDeg + 60; deg += 5)
-            {
-                int displayDeg = ((deg % 360) + 360) % 360;
-                float offset = (deg - heading) * pixelsPerHeadingDeg;
-                float x = screenCenterX + offset;
-
-                if (x < boxLeft || x > boxRight) continue;
-
-                bool isMajor = (displayDeg % 10 == 0);
-                float len = isMajor ? tickHeight : tickHeight * 0.5f;
-
-                GL.Vertex3(x, tapeY, 0);
-                GL.Vertex3(x, tapeY + len, 0);
-            }
-
-            GL.End();
-        }
-
-        private void DrawAirspeedTape(float airspeed, float mach)
-        {
-            float scale = config.HUDScale;
-            float tapeX = 120 * scale;
-            float tapeHeight = 200 * scale;
-            float tapeWidth = 60 * scale;
-            float tickLen = 8 * scale;
-
-            float cy = screenCenterY;
-            float top = cy - tapeHeight / 2;
-            float bottom = cy + tapeHeight / 2;
-
-            GL.Begin(GL.LINES);
-            GL.Color(hudColor);
-
-            GL.Vertex3(tapeX, top, 0);
-            GL.Vertex3(tapeX, bottom, 0);
-            GL.Vertex3(tapeX, top, 0);
-            GL.Vertex3(tapeX + tapeWidth, top, 0);
-            GL.Vertex3(tapeX, bottom, 0);
-            GL.Vertex3(tapeX + tapeWidth, bottom, 0);
-
-            GL.Vertex3(tapeX + tapeWidth, cy - 8 * scale, 0);
-            GL.Vertex3(tapeX + tapeWidth + 15 * scale, cy, 0);
-            GL.Vertex3(tapeX + tapeWidth + 15 * scale, cy, 0);
-            GL.Vertex3(tapeX + tapeWidth, cy + 8 * scale, 0);
-
-            float pixelsPerUnit = tapeHeight / 100f;
-            int startVal = Mathf.FloorToInt((airspeed - 50) / 10) * 10;
-
-            for (int val = startVal; val <= startVal + 100; val += 10)
-            {
-                if (val < 0) continue;
-                float offset = (val - airspeed) * pixelsPerUnit;
-                float y = cy - offset;
-
-                if (y < top || y > bottom) continue;
-
-                bool isMajor = (val % 50 == 0);
-                float len = isMajor ? tickLen * 1.5f : tickLen;
-
-                GL.Vertex3(tapeX, y, 0);
-                GL.Vertex3(tapeX + len, y, 0);
-            }
-
-            GL.End();
-        }
-
-        private void DrawAltitudeTape(float altitude, float radarAlt)
-        {
-            float scale = config.HUDScale;
-            float tapeX = Screen.width - 120 * scale;
-            float tapeHeight = 200 * scale;
-            float tapeWidth = 60 * scale;
-            float tickLen = 8 * scale;
-
-            float cy = screenCenterY;
-            float top = cy - tapeHeight / 2;
-            float bottom = cy + tapeHeight / 2;
-
-            GL.Begin(GL.LINES);
-            GL.Color(hudColor);
-
-            GL.Vertex3(tapeX, top, 0);
-            GL.Vertex3(tapeX, bottom, 0);
-            GL.Vertex3(tapeX - tapeWidth, top, 0);
-            GL.Vertex3(tapeX, top, 0);
-            GL.Vertex3(tapeX - tapeWidth, bottom, 0);
-            GL.Vertex3(tapeX, bottom, 0);
-
-            GL.Vertex3(tapeX - tapeWidth, cy - 8 * scale, 0);
-            GL.Vertex3(tapeX - tapeWidth - 15 * scale, cy, 0);
-            GL.Vertex3(tapeX - tapeWidth - 15 * scale, cy, 0);
-            GL.Vertex3(tapeX - tapeWidth, cy + 8 * scale, 0);
-
-            float range, increment;
-            if (altitude < 1000)
-            {
-                range = 500f;
-                increment = 50f;
-            }
-            else if (altitude < 10000)
-            {
-                range = 2000f;
-                increment = 200f;
-            }
-            else
-            {
-                range = 10000f;
-                increment = 1000f;
-            }
-
-            float pixelsPerUnit = tapeHeight / range;
-            int startVal = Mathf.FloorToInt((altitude - range / 2) / increment) * (int)increment;
-
-            for (float val = startVal; val <= startVal + range; val += increment)
-            {
-                if (val < 0) continue;
-                float offset = (val - altitude) * pixelsPerUnit;
-                float y = cy - offset;
-
-                if (y < top || y > bottom) continue;
-
-                bool isMajor = (val % (increment * 5) == 0) || (increment >= 1000);
-                float len = isMajor ? tickLen * 1.5f : tickLen;
-
-                GL.Vertex3(tapeX - len, y, 0);
-                GL.Vertex3(tapeX, y, 0);
-            }
-
-            GL.End();
-        }
-
-        private void DrawVerticalSpeedIndicator(float vertSpeed)
-        {
-            float scale = config.HUDScale;
-            float x = Screen.width - 60 * scale;
-            float height = 100 * scale;
-            float cy = screenCenterY;
-
-            GL.Begin(GL.LINES);
-            GL.Color(hudColor);
-
-            GL.Vertex3(x, cy - height, 0);
-            GL.Vertex3(x, cy + height, 0);
-
-            GL.Vertex3(x - 5 * scale, cy, 0);
-            GL.Vertex3(x + 5 * scale, cy, 0);
-
-            float maxVS = 100f;
-            float[] ticks = { -100, -50, 50, 100 };
-            foreach (float vs in ticks)
-            {
-                float y = cy - (vs / maxVS) * height;
-                GL.Vertex3(x - 3 * scale, y, 0);
-                GL.Vertex3(x + 3 * scale, y, 0);
-            }
-
-            float clampedVS = Mathf.Clamp(vertSpeed, -maxVS, maxVS);
-            float indicatorY = cy - (clampedVS / maxVS) * height;
-
-            GL.End();
-            GL.Begin(GL.TRIANGLES);
-            GL.Color(hudColor);
-            GL.Vertex3(x - 10 * scale, indicatorY, 0);
-            GL.Vertex3(x, indicatorY - 5 * scale, 0);
-            GL.Vertex3(x, indicatorY + 5 * scale, 0);
-            GL.End();
-        }
-
-        private void DrawTextLabels(float airspeed, float altitude, float radarAlt,
-            float vertSpeed, float gForce, float aoa, float heading, float mach)
-        {
-            float scale = config.HUDScale;
+            float scale = Config.HUDScale;
 
             labelStyle.normal.textColor = hudColor;
             labelStyleSmall.normal.textColor = hudColor;
             labelStyleCenter.normal.textColor = hudColor;
 
-            string speedStr = airspeed.ToString("F0");
-            GUI.Label(new Rect(80 * scale, screenCenterY - 10, 60, 25), speedStr, labelStyle);
-
-            if (mach > 0.8f)
+            // Airspeed
+            if (Config.ShowAirspeedTape)
             {
-                GUI.Label(new Rect(80 * scale, screenCenterY + 15, 60, 20), "M" + mach.ToString("F2"), labelStyleSmall);
+                string speedStr = flightData.Airspeed.ToString("F0");
+                GUI.Label(new Rect(80 * scale, screenCenterY - 10, 60, 25), speedStr, labelStyle);
+
+                if (flightData.Mach > 0.8f)
+                {
+                    GUI.Label(new Rect(80 * scale, screenCenterY + 15, 60, 20), "M" + flightData.Mach.ToString("F2"), labelStyleSmall);
+                }
             }
 
-            string altStr;
-            if (altitude >= 10000)
-                altStr = (altitude / 1000f).ToString("F1") + "k";
-            else
-                altStr = altitude.ToString("F0");
-            GUI.Label(new Rect(Screen.width - 140 * scale, screenCenterY - 10, 60, 25), altStr, labelStyle);
-
-            if (radarAlt < 1000 && radarAlt > 0)
+            // Altitude
+            if (Config.ShowAltitudeTape)
             {
-                GUI.Label(new Rect(Screen.width - 140 * scale, screenCenterY + 15, 60, 20),
-                    "R" + radarAlt.ToString("F0"), labelStyleSmall);
+                string altStr;
+                if (flightData.Altitude >= 10000)
+                    altStr = (flightData.Altitude / 1000f).ToString("F1") + "k";
+                else
+                    altStr = flightData.Altitude.ToString("F0");
+                GUI.Label(new Rect(Screen.width - 140 * scale, screenCenterY - 10, 60, 25), altStr, labelStyle);
+
+                if (flightData.RadarAltitude < 1000 && flightData.RadarAltitude > 0)
+                {
+                    GUI.Label(new Rect(Screen.width - 140 * scale, screenCenterY + 15, 60, 20),
+                        "R" + flightData.RadarAltitude.ToString("F0"), labelStyleSmall);
+                }
             }
 
-            string vsStr = (vertSpeed >= 0 ? "+" : "") + vertSpeed.ToString("F0");
-            GUI.Label(new Rect(Screen.width - 55 * scale, screenCenterY - 10, 50, 25), vsStr, labelStyleSmall);
+            // Vertical speed
+            if (Config.ShowVSI)
+            {
+                string vsStr = (flightData.VerticalSpeed >= 0 ? "+" : "") + flightData.VerticalSpeed.ToString("F0");
+                GUI.Label(new Rect(Screen.width - 55 * scale, screenCenterY - 10, 50, 25), vsStr, labelStyleSmall);
+            }
 
-            string hdgStr = heading.ToString("F0").PadLeft(3, '0');
-            GUI.Label(new Rect(screenCenterX - 20, 55 * scale, 40, 25), hdgStr, labelStyleCenter);
+            // Heading
+            if (Config.ShowHeadingTape)
+            {
+                string hdgStr = flightData.Heading.ToString("F0").PadLeft(3, '0');
+                GUI.Label(new Rect(screenCenterX - 20, 55 * scale, 40, 25), hdgStr, labelStyleCenter);
 
-            DrawHeadingLabels(heading, scale);
+                DrawHeadingLabels(scale);
+            }
 
-            GUI.Label(new Rect(screenCenterX - 80 * scale, Screen.height - 60 * scale, 60, 25),
-                "G " + gForce.ToString("F1"), labelStyle);
+            // G-Force and AOA
+            if (Config.ShowGForceAOA)
+            {
+                GUI.Label(new Rect(screenCenterX - 80 * scale, Screen.height - 60 * scale, 60, 25),
+                    "G " + flightData.GForce.ToString("F1"), labelStyle);
 
-            GUI.Label(new Rect(screenCenterX + 30 * scale, Screen.height - 60 * scale, 60, 25),
-                "AOA " + aoa.ToString("F1") + "\u00B0", labelStyle);
+                GUI.Label(new Rect(screenCenterX + 30 * scale, Screen.height - 60 * scale, 80, 25),
+                    "AOA " + flightData.AOA.ToString("F1") + "\u00B0", labelStyle);
+            }
 
-            DrawPitchLabels(scale);
+            // Compass rose labels
+            if (Config.ShowCompassRose)
+            {
+                DrawCompassLabels(scale);
+            }
+
+            // Pitch ladder labels
+            if (Config.ShowPitchLadder)
+            {
+                DrawPitchLabels(scale);
+            }
         }
 
-        private void DrawHeadingLabels(float heading, float scale)
+        private void DrawHeadingLabels(float scale)
         {
             float tapeWidth = 300 * scale;
             float tapeY = 22 * scale;
@@ -665,7 +303,7 @@ namespace FlightHUD
 
             for (int i = 0; i < 4; i++)
             {
-                float offset = Mathf.DeltaAngle(heading, cardinalDegrees[i]) * pixelsPerHeadingDeg;
+                float offset = Mathf.DeltaAngle(flightData.Heading, cardinalDegrees[i]) * pixelsPerHeadingDeg;
                 float x = screenCenterX + offset;
 
                 if (Mathf.Abs(offset) < tapeWidth / 2)
@@ -673,34 +311,35 @@ namespace FlightHUD
                     GUI.Label(new Rect(x - 10, tapeY, 20, 20), cardinals[i], labelStyleCenter);
                 }
             }
+        }
 
-            int startDeg = Mathf.FloorToInt(heading / 30) * 30 - 30;
-            for (int deg = startDeg; deg <= startDeg + 90; deg += 30)
+        private void DrawCompassLabels(float scale)
+        {
+            float cy = Screen.height - 80 * scale;
+            float radius = 50 * scale;
+
+            string[] cardinals = { "N", "E", "S", "W" };
+            int[] cardinalDegrees = { 0, 90, 180, 270 };
+
+            for (int i = 0; i < 4; i++)
             {
-                int displayDeg = ((deg % 360) + 360) % 360;
-                float offset = Mathf.DeltaAngle(heading, deg) * pixelsPerHeadingDeg;
-                float x = screenCenterX + offset;
+                float angle = (90 - (cardinalDegrees[i] - flightData.Heading)) * Mathf.Deg2Rad;
+                float x = screenCenterX + Mathf.Cos(angle) * (radius - 20 * scale);
+                float y = cy + Mathf.Sin(angle) * (radius - 20 * scale);
 
-                if (Mathf.Abs(offset) < tapeWidth / 2 && displayDeg % 90 != 0)
-                {
-                    GUI.Label(new Rect(x - 15, tapeY, 30, 20), displayDeg.ToString(), labelStyleSmall);
-                }
+                GUI.Label(new Rect(x - 10, y - 10, 20, 20), cardinals[i], labelStyleCenter);
             }
         }
 
         private void DrawPitchLabels(float scale)
         {
-            if (vessel == null) return;
-
-            float pitch = GetPitch();
-            float roll = GetRoll();
             float ladderWidth = 120f * scale;
 
             for (int deg = -90; deg <= 90; deg += 10)
             {
                 if (deg == 0) continue;
 
-                float yOffset = (deg - pitch) * pixelsPerDegree;
+                float yOffset = (deg - flightData.Pitch) * pixelsPerDegree;
                 float y = screenCenterY - yOffset;
 
                 if (y < 80 || y > Screen.height - 80) continue;
@@ -708,15 +347,24 @@ namespace FlightHUD
                 float labelX = screenCenterX + ladderWidth + 10 * scale;
                 float labelY = y - 8;
 
+                // Apply roll rotation
                 float dx = labelX - screenCenterX;
                 float dy = labelY - screenCenterY;
-                float rollRad = -roll * Mathf.Deg2Rad;
+                float rollRad = -flightData.Roll * Mathf.Deg2Rad;
                 float rotX = dx * Mathf.Cos(rollRad) - dy * Mathf.Sin(rollRad);
                 float rotY = dx * Mathf.Sin(rollRad) + dy * Mathf.Cos(rollRad);
 
                 GUI.Label(new Rect(screenCenterX + rotX, screenCenterY + rotY, 30, 20),
                     deg.ToString(), labelStyleSmall);
             }
+        }
+
+        public void ToggleHUD()
+        {
+            Config.HUDEnabled = !Config.HUDEnabled;
+            ScreenMessages.PostScreenMessage(
+                "Flight HUD: " + (Config.HUDEnabled ? "ON" : "OFF"),
+                2f, ScreenMessageStyle.UPPER_CENTER);
         }
     }
 }
