@@ -28,7 +28,7 @@ namespace FlightHUD
             GL.PushMatrix();
             Matrix4x4 rotMatrix = Matrix4x4.TRS(
                 new Vector3(screenCenterX, screenCenterY, 0),
-                Quaternion.Euler(0, 0, roll),
+                Quaternion.Euler(0, 0, -roll),  // Negate roll for correct rotation direction
                 Vector3.one);
             GL.MultMatrix(rotMatrix * Matrix4x4.TRS(new Vector3(-screenCenterX, -screenCenterY, 0), Quaternion.identity, Vector3.one));
 
@@ -36,10 +36,9 @@ namespace FlightHUD
             {
                 if (deg == 0) continue;
 
-                // Positive pitch = nose up = horizon moves down on screen
-                // So +10 line should be above center (lower Y) when level
-                float yOffset = (pitch - deg) * pixelsPerDegree;
-                float y = screenCenterY + yOffset;
+                // When level: +10 line above center, -10 below
+                // When nose up (pitch > 0): all lines move down (horizon drops)
+                float y = screenCenterY - (deg - pitch) * pixelsPerDegree;
 
                 if (y < 50 || y > Screen.height - 50) continue;
 
@@ -89,7 +88,7 @@ namespace FlightHUD
                 GL.End();
             }
 
-            // Horizon line
+            // Horizon line (deg=0, so y = screenCenterY - (0 - pitch) * ppd = screenCenterY + pitch * ppd)
             float horizonY = screenCenterY + pitch * pixelsPerDegree;
             if (horizonY > 50 && horizonY < Screen.height - 50)
             {
@@ -215,8 +214,8 @@ namespace FlightHUD
 
             GL.End();
 
-            // Roll pointer triangle
-            float pointerAngle = (90 - roll) * Mathf.Deg2Rad;
+            // Roll pointer triangle - positive roll (right bank) moves pointer right
+            float pointerAngle = (90 + roll) * Mathf.Deg2Rad;
             float px = screenCenterX + Mathf.Cos(pointerAngle) * (radius + 5 * scale);
             float py = cy + Mathf.Sin(pointerAngle) * (radius + 5 * scale);
 
