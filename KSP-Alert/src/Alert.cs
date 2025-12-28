@@ -28,7 +28,16 @@ namespace KSPAlert
         GearDown,
         OrbitAchieved,
         SASChange,
-        Staging
+        Staging,
+
+        // Radio altitude callouts (landing mode)
+        Altitude50,
+        Altitude40,
+        Altitude30,
+        Altitude20,
+        Altitude10,
+        Altitude5,
+        Retard
     }
 
     public class Alert
@@ -117,6 +126,49 @@ namespace KSPAlert
         {
             return new Alert(AlertType.CommsLost, AlertPriority.Caution,
                 "NO SIGNAL", "SIGNAL LOST", 30f);
+        }
+
+        // Radio altitude callouts - short cooldown since they're one-shot per altitude
+        public static Alert CreateAltitude50()
+        {
+            return new Alert(AlertType.Altitude50, AlertPriority.Advisory,
+                "50", "FIFTY", 0.5f);
+        }
+
+        public static Alert CreateAltitude40()
+        {
+            return new Alert(AlertType.Altitude40, AlertPriority.Advisory,
+                "40", "FORTY", 0.5f);
+        }
+
+        public static Alert CreateAltitude30()
+        {
+            return new Alert(AlertType.Altitude30, AlertPriority.Advisory,
+                "30", "THIRTY", 0.5f);
+        }
+
+        public static Alert CreateAltitude20()
+        {
+            return new Alert(AlertType.Altitude20, AlertPriority.Advisory,
+                "20", "TWENTY", 0.5f);
+        }
+
+        public static Alert CreateAltitude10()
+        {
+            return new Alert(AlertType.Altitude10, AlertPriority.Advisory,
+                "10", "TEN", 0.5f);
+        }
+
+        public static Alert CreateAltitude5()
+        {
+            return new Alert(AlertType.Altitude5, AlertPriority.Advisory,
+                "5", "FIVE", 0.5f);
+        }
+
+        public static Alert CreateRetard()
+        {
+            return new Alert(AlertType.Retard, AlertPriority.Advisory,
+                "RETARD", "RETARD RETARD", 0.5f);
         }
     }
 }

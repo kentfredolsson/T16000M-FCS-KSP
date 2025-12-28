@@ -41,9 +41,17 @@ namespace KSPAlert
         public float HighGWarning = 8f;                  // G-force
         public float HighGCaution = 6f;                  // G-force
 
+        // Landing mode settings (radio altitude callouts)
+        public bool LandingCalloutsEnabled = true;
+        public float LandingModeMaxDescentRate = 100f;   // m/s - must be descending slower than this
+        public float LandingModeMaxSpeed = 150f;         // m/s - must be slower than this
+
         // Visual settings
         public bool ScreenFlashEnabled = true;
         public float FlashIntensity = 0.3f;
+
+        // Keybind settings
+        public KeyCode ToggleKey = KeyCode.F12;
 
         // Display position
         public float DisplayX = 0.5f;                    // Screen center X (0-1)
@@ -84,8 +92,13 @@ namespace KSPAlert
             root.AddValue("HighGWarning", HighGWarning);
             root.AddValue("HighGCaution", HighGCaution);
 
+            root.AddValue("LandingCalloutsEnabled", LandingCalloutsEnabled);
+            root.AddValue("LandingModeMaxDescentRate", LandingModeMaxDescentRate);
+            root.AddValue("LandingModeMaxSpeed", LandingModeMaxSpeed);
+
             root.AddValue("ScreenFlashEnabled", ScreenFlashEnabled);
             root.AddValue("FlashIntensity", FlashIntensity);
+            root.AddValue("ToggleKey", ToggleKey.ToString());
             root.AddValue("DisplayX", DisplayX);
             root.AddValue("DisplayY", DisplayY);
 
@@ -127,10 +140,28 @@ namespace KSPAlert
             float.TryParse(root.GetValue("HighGWarning"), out HighGWarning);
             float.TryParse(root.GetValue("HighGCaution"), out HighGCaution);
 
+            bool.TryParse(root.GetValue("LandingCalloutsEnabled"), out LandingCalloutsEnabled);
+            float.TryParse(root.GetValue("LandingModeMaxDescentRate"), out LandingModeMaxDescentRate);
+            float.TryParse(root.GetValue("LandingModeMaxSpeed"), out LandingModeMaxSpeed);
+
             bool.TryParse(root.GetValue("ScreenFlashEnabled"), out ScreenFlashEnabled);
             float.TryParse(root.GetValue("FlashIntensity"), out FlashIntensity);
             float.TryParse(root.GetValue("DisplayX"), out DisplayX);
             float.TryParse(root.GetValue("DisplayY"), out DisplayY);
+
+            // Load toggle key
+            string toggleKeyStr = root.GetValue("ToggleKey");
+            if (!string.IsNullOrEmpty(toggleKeyStr))
+            {
+                try
+                {
+                    ToggleKey = (KeyCode)System.Enum.Parse(typeof(KeyCode), toggleKeyStr);
+                }
+                catch
+                {
+                    ToggleKey = KeyCode.F12;
+                }
+            }
         }
     }
 }

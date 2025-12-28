@@ -29,6 +29,10 @@ namespace KSPAlert
         private bool gearDeployed;
         private bool hasComms;
 
+        // Landing mode state
+        private bool isInLandingMode;
+        private int lastAltitudeCallout;  // Track which callout was last triggered
+
         private float lastUpdateTime;
         private const float UPDATE_INTERVAL = 0.1f; // 10 Hz update rate
 
@@ -67,8 +71,18 @@ namespace KSPAlert
                 { AlertType.Overheat, Alert.CreateOverheat() },
                 { AlertType.Stall, Alert.CreateStall() },
                 { AlertType.HighG, Alert.CreateHighG() },
-                { AlertType.CommsLost, Alert.CreateCommsLost() }
+                { AlertType.CommsLost, Alert.CreateCommsLost() },
+                // Radio altitude callouts
+                { AlertType.Altitude50, Alert.CreateAltitude50() },
+                { AlertType.Altitude40, Alert.CreateAltitude40() },
+                { AlertType.Altitude30, Alert.CreateAltitude30() },
+                { AlertType.Altitude20, Alert.CreateAltitude20() },
+                { AlertType.Altitude10, Alert.CreateAltitude10() },
+                { AlertType.Altitude5, Alert.CreateAltitude5() },
+                { AlertType.Retard, Alert.CreateRetard() }
             };
+
+            lastAltitudeCallout = 999;  // Start with high value
         }
 
         void Update()
@@ -161,14 +175,36 @@ namespace KSPAlert
 
             // Check comms
             hasComms = vessel.Connection != null && vessel.Connection.IsConnected;
+
+            // Determine if we're in landing mode
+            // Landing mode: gear deployed, descending (any rate), low altitude
+            // This suppresses terrain and gear warnings when you're intentionally landing
+            isInLandingMode = gearDeployed &&
+                              verticalSpeed < 0 &&
+                              altitudeAGL < 60;  // Below 60m with gear down = landing
+
+            // Reset altitude callout tracking if we climb back up above 60m
+            if (altitudeAGL > 60)
+            {
+                lastAltitudeCallout = 999;
+            }
         }
 
         private void CheckAllAlerts()
         {
             activeAlerts.Clear();
 
-            CheckTerrainAlert();
-            CheckGearAlert();
+            // In landing mode, skip terrain and gear warnings, show altitude callouts instead
+            if (isInLandingMode)
+            {
+                CheckLandingCallouts();
+            }
+            else
+            {
+                CheckTerrainAlert();
+                CheckGearAlert();
+            }
+
             CheckFuelAlert();
             CheckPowerAlert();
             CheckOverheatAlert();
@@ -184,12 +220,61 @@ namespace KSPAlert
 
         private bool IsAlertSilenced(AlertType type)
         {
-            // Check both old panel and new main window for backwards compatibility
             if (AlertMainWindow.Instance != null && AlertMainWindow.Instance.IsAlertSilenced(type))
                 return true;
-            if (AlertPanel.Instance != null && AlertPanel.Instance.IsAlertSilenced(type))
-                return true;
             return false;
+        }
+
+        private void CheckLandingCallouts()
+        {
+            if (!Config.LandingCalloutsEnabled) return;
+
+            // Only call out each altitude once per approach, in descending order
+            int currentAlt = (int)altitudeAGL;
+            AlertType? calloutType = null;
+
+            // Check altitude thresholds - only trigger if we haven't called this one yet
+            if (currentAlt <= 5 && lastAltitudeCallout > 5)
+            {
+                calloutType = AlertType.Retard;  // RETARD at 5m and below
+                lastAltitudeCallout = 5;
+            }
+            else if (currentAlt <= 10 && currentAlt > 5 && lastAltitudeCallout > 10)
+            {
+                calloutType = AlertType.Altitude10;
+                lastAltitudeCallout = 10;
+            }
+            else if (currentAlt <= 20 && currentAlt > 10 && lastAltitudeCallout > 20)
+            {
+                calloutType = AlertType.Altitude20;
+                lastAltitudeCallout = 20;
+            }
+            else if (currentAlt <= 30 && currentAlt > 20 && lastAltitudeCallout > 30)
+            {
+                calloutType = AlertType.Altitude30;
+                lastAltitudeCallout = 30;
+            }
+            else if (currentAlt <= 40 && currentAlt > 30 && lastAltitudeCallout > 40)
+            {
+                calloutType = AlertType.Altitude40;
+                lastAltitudeCallout = 40;
+            }
+            else if (currentAlt <= 50 && currentAlt > 40 && lastAltitudeCallout > 50)
+            {
+                calloutType = AlertType.Altitude50;
+                lastAltitudeCallout = 50;
+            }
+
+            if (calloutType.HasValue && alerts.ContainsKey(calloutType.Value))
+            {
+                var alert = alerts[calloutType.Value];
+                if (alert.CanTrigger())
+                {
+                    alert.Trigger();
+                    audio?.PlayAlert(alert);
+                }
+                activeAlerts.Add(alert);
+            }
         }
 
         private void CheckTerrainAlert()
@@ -390,5 +475,15 @@ namespace KSPAlert
                 display?.UpdateAlerts(activeAlerts);
             }
         }
+
+        // Public properties for UI display
+        public double AltitudeAGL => altitudeAGL;
+        public double VerticalSpeed => verticalSpeed;
+        public bool IsLandingMode => isInLandingMode;
+        public bool GearDeployed => gearDeployed;
+        public int LastAltitudeCallout => lastAltitudeCallout;
+
+        // Check if audio is currently playing
+        public bool IsAudioPlaying => audio != null && audio.IsPlaying();
     }
 }

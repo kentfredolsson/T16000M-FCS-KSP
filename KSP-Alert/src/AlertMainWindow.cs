@@ -65,8 +65,10 @@ namespace KSPAlert
 
         void Update()
         {
-            // F10 toggles window
-            if (Input.GetKeyDown(KeyCode.F10))
+            // Configurable toggle key (default F12)
+            var config = AlertManager.Instance?.Config;
+            KeyCode toggleKey = config?.ToggleKey ?? KeyCode.F12;
+            if (Input.GetKeyDown(toggleKey))
             {
                 ToggleWindow();
             }
@@ -257,13 +259,55 @@ namespace KSPAlert
             GUILayout.EndScrollView();
 
             GUILayout.Space(5);
-            GUILayout.Label("F10: Toggle Window", GUI.skin.label);
+            GUILayout.Label($"{config.ToggleKey}: Toggle Window", GUI.skin.label);
 
             GUI.DragWindow();
         }
 
         private void DrawAlertsTab(AlertConfig config)
         {
+            // Landing mode status display
+            var manager = AlertManager.Instance;
+            if (manager != null)
+            {
+                GUILayout.Label("Flight Status", sectionStyle);
+
+                // Altitude and vertical speed
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"AGL: {manager.AltitudeAGL:F0}m", GUILayout.Width(100));
+                GUILayout.Label($"V/S: {manager.VerticalSpeed:F1}m/s", GUILayout.Width(100));
+                GUILayout.EndHorizontal();
+
+                // Landing mode indicator
+                GUILayout.BeginHorizontal();
+                string gearStatus = manager.GearDeployed ? "GEAR DN" : "GEAR UP";
+                GUI.contentColor = manager.GearDeployed ? Color.green : Color.yellow;
+                GUILayout.Label(gearStatus, GUILayout.Width(70));
+
+                if (manager.IsLandingMode)
+                {
+                    GUI.contentColor = Color.cyan;
+                    GUILayout.Label("LANDING MODE", GUILayout.Width(100));
+
+                    // Show next callout
+                    int nextCallout = manager.LastAltitudeCallout;
+                    if (nextCallout > 50) nextCallout = 50;
+                    else if (nextCallout > 40) nextCallout = 40;
+                    else if (nextCallout > 30) nextCallout = 30;
+                    else if (nextCallout > 20) nextCallout = 20;
+                    else if (nextCallout > 10) nextCallout = 10;
+                    else if (nextCallout > 5) nextCallout = 5;
+                    else nextCallout = 0;
+
+                    if (nextCallout > 0)
+                        GUILayout.Label($"Next: {nextCallout}", GUILayout.Width(60));
+                }
+                GUI.contentColor = Color.white;
+                GUILayout.EndHorizontal();
+
+                GUILayout.Space(10);
+            }
+
             // Volume control
             GUILayout.Label("Volume", sectionStyle);
             GUILayout.BeginHorizontal();
@@ -377,6 +421,7 @@ namespace KSPAlert
             config.OverheatEnabled = GUILayout.Toggle(config.OverheatEnabled, "Overheat Warning", toggleStyle);
             config.HighGEnabled = GUILayout.Toggle(config.HighGEnabled, "High G-Force Warning", toggleStyle);
             config.CommsEnabled = GUILayout.Toggle(config.CommsEnabled, "Communications Lost", toggleStyle);
+            config.LandingCalloutsEnabled = GUILayout.Toggle(config.LandingCalloutsEnabled, "Landing Altitude Callouts", toggleStyle);
 
             GUILayout.Space(15);
 
@@ -409,10 +454,24 @@ namespace KSPAlert
 
             GUILayout.Space(10);
 
+            // Landing mode settings
+            GUILayout.Label("Landing Callouts (50,40,30,20,10,5,RETARD)", sectionStyle);
+            DrawSlider("Max Descent (m/s):", ref config.LandingModeMaxDescentRate, 20f, 200f);
+            DrawSlider("Max Speed (m/s):", ref config.LandingModeMaxSpeed, 50f, 300f);
+            GUILayout.Label("(Requires gear down)", GUI.skin.label);
+
+            GUILayout.Space(10);
+
             // Visual settings
             GUILayout.Label("Visual Settings", sectionStyle);
             config.ScreenFlashEnabled = GUILayout.Toggle(config.ScreenFlashEnabled, "Screen Flash Effect", toggleStyle);
             DrawSlider("Flash Intensity:", ref config.FlashIntensity, 0.1f, 0.5f);
+
+            GUILayout.Space(10);
+
+            // Keybind settings
+            GUILayout.Label("Keybinds", sectionStyle);
+            DrawKeybindSelector("Toggle Window:", ref config.ToggleKey);
 
             GUILayout.Space(15);
 
@@ -488,6 +547,48 @@ namespace KSPAlert
             GUI.backgroundColor = Color.white;
             GUILayout.EndHorizontal();
 
+            GUILayout.Space(10);
+
+            // Landing callouts (blue)
+            GUILayout.Label("LANDING CALLOUTS (Blue)", alertLabelStyle);
+            GUILayout.BeginHorizontal();
+            GUI.backgroundColor = new Color(0.2f, 0.5f, 0.8f);
+            if (GUILayout.Button("50", testButtonStyle, GUILayout.Height(35)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.Altitude50);
+            }
+            if (GUILayout.Button("40", testButtonStyle, GUILayout.Height(35)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.Altitude40);
+            }
+            if (GUILayout.Button("30", testButtonStyle, GUILayout.Height(35)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.Altitude30);
+            }
+            if (GUILayout.Button("20", testButtonStyle, GUILayout.Height(35)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.Altitude20);
+            }
+            GUI.backgroundColor = Color.white;
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUI.backgroundColor = new Color(0.2f, 0.5f, 0.8f);
+            if (GUILayout.Button("10", testButtonStyle, GUILayout.Height(35)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.Altitude10);
+            }
+            if (GUILayout.Button("5", testButtonStyle, GUILayout.Height(35)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.Altitude5);
+            }
+            if (GUILayout.Button("RETARD", testButtonStyle, GUILayout.Height(35)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.Retard);
+            }
+            GUI.backgroundColor = Color.white;
+            GUILayout.EndHorizontal();
+
             GUILayout.Space(15);
 
             // Test all
@@ -509,13 +610,32 @@ namespace KSPAlert
                 AlertType.LowFuel,
                 AlertType.LowPower,
                 AlertType.HighG,
-                AlertType.CommsLost
+                AlertType.CommsLost,
+                // Also test landing callouts
+                AlertType.Altitude50,
+                AlertType.Altitude40,
+                AlertType.Altitude30,
+                AlertType.Altitude20,
+                AlertType.Altitude10,
+                AlertType.Altitude5,
+                AlertType.Retard
             };
 
             foreach (var alertType in testOrder)
             {
                 AlertManager.Instance?.TriggerTestAlert(alertType);
-                yield return new WaitForSeconds(2.5f);
+
+                // Wait for sound to start playing
+                yield return new WaitForSeconds(0.1f);
+
+                // Wait until sound finishes playing
+                while (AlertManager.Instance != null && AlertManager.Instance.IsAudioPlaying)
+                {
+                    yield return null;
+                }
+
+                // Small gap between sounds
+                yield return new WaitForSeconds(0.3f);
             }
 
             ScreenMessages.PostScreenMessage("Alert test complete", 2f);
@@ -527,6 +647,43 @@ namespace KSPAlert
             GUILayout.Label(label, GUILayout.Width(120));
             value = GUILayout.HorizontalSlider(value, min, max, GUILayout.Width(120));
             GUILayout.Label($"{value:F1}", GUILayout.Width(50));
+            GUILayout.EndHorizontal();
+        }
+
+        // Available toggle keys for the dropdown
+        private static readonly KeyCode[] availableKeys = new KeyCode[]
+        {
+            KeyCode.F1, KeyCode.F2, KeyCode.F3, KeyCode.F4, KeyCode.F5,
+            KeyCode.F6, KeyCode.F7, KeyCode.F8, KeyCode.F9, KeyCode.F10,
+            KeyCode.F11, KeyCode.F12
+        };
+
+        private void DrawKeybindSelector(string label, ref KeyCode currentKey)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(label, GUILayout.Width(120));
+
+            // Find current index
+            int currentIndex = System.Array.IndexOf(availableKeys, currentKey);
+            if (currentIndex < 0) currentIndex = 11; // Default to F12 index
+
+            // Previous key button
+            if (GUILayout.Button("<", GUILayout.Width(25), GUILayout.Height(24)))
+            {
+                currentIndex = (currentIndex - 1 + availableKeys.Length) % availableKeys.Length;
+                currentKey = availableKeys[currentIndex];
+            }
+
+            // Current key display
+            GUILayout.Label(currentKey.ToString(), headerStyle, GUILayout.Width(60));
+
+            // Next key button
+            if (GUILayout.Button(">", GUILayout.Width(25), GUILayout.Height(24)))
+            {
+                currentIndex = (currentIndex + 1) % availableKeys.Length;
+                currentKey = availableKeys[currentIndex];
+            }
+
             GUILayout.EndHorizontal();
         }
 

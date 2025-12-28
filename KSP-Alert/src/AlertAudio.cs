@@ -51,6 +51,15 @@ namespace KSPAlert
             yield return StartCoroutine(LoadSound("stall.wav", AlertType.Stall));
             yield return StartCoroutine(LoadSound("gforce.wav", AlertType.HighG));
             yield return StartCoroutine(LoadSound("comms.wav", AlertType.CommsLost));
+
+            // Radio altitude callouts
+            yield return StartCoroutine(LoadSound("50.wav", AlertType.Altitude50));
+            yield return StartCoroutine(LoadSound("40.wav", AlertType.Altitude40));
+            yield return StartCoroutine(LoadSound("30.wav", AlertType.Altitude30));
+            yield return StartCoroutine(LoadSound("20.wav", AlertType.Altitude20));
+            yield return StartCoroutine(LoadSound("10.wav", AlertType.Altitude10));
+            yield return StartCoroutine(LoadSound("5.wav", AlertType.Altitude5));
+            yield return StartCoroutine(LoadSound("retard.wav", AlertType.Retard));
         }
 
         private IEnumerator LoadSound(string filename, AlertType alertType)
@@ -59,7 +68,11 @@ namespace KSPAlert
 
             if (!File.Exists(filePath))
             {
-                Debug.Log($"[KSP-Alert] No custom sound file: {filename}");
+                // Don't log for altitude callouts since we have generated fallbacks
+                if (!IsAltitudeCallout(alertType))
+                {
+                    Debug.Log($"[KSP-Alert] No custom sound file: {filename}");
+                }
                 yield break;
             }
 
@@ -74,7 +87,7 @@ namespace KSPAlert
                     AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
                     if (clip != null)
                     {
-                        customClips[alertType] = clip;
+                        customClips[alertType] = clip;  // Overrides generated fallback
                         Debug.Log($"[KSP-Alert] Loaded custom sound: {filename}");
                     }
                 }
@@ -83,6 +96,14 @@ namespace KSPAlert
                     Debug.LogWarning($"[KSP-Alert] Failed to load {filename}: {www.error}");
                 }
             }
+        }
+
+        private bool IsAltitudeCallout(AlertType type)
+        {
+            return type == AlertType.Altitude50 || type == AlertType.Altitude40 ||
+                   type == AlertType.Altitude30 || type == AlertType.Altitude20 ||
+                   type == AlertType.Altitude10 || type == AlertType.Altitude5 ||
+                   type == AlertType.Retard;
         }
 
         private void GenerateTones()
@@ -97,6 +118,107 @@ namespace KSPAlert
 
             // Advisory: Soft chime
             toneClips[AlertPriority.Advisory] = GenerateAdvisoryTone();
+
+            // Generate altitude callout beeps as fallbacks
+            // These will be used if no custom WAV files are provided
+            GenerateAltitudeCallouts();
+        }
+
+        private void GenerateAltitudeCallouts()
+        {
+            // Generate distinct beep patterns for each altitude
+            // Higher altitude = lower pitch, lower altitude = higher pitch
+            customClips[AlertType.Altitude50] = GenerateAltitudeBeep(5, 600f);   // 5 beeps, low pitch
+            customClips[AlertType.Altitude40] = GenerateAltitudeBeep(4, 700f);   // 4 beeps
+            customClips[AlertType.Altitude30] = GenerateAltitudeBeep(3, 800f);   // 3 beeps
+            customClips[AlertType.Altitude20] = GenerateAltitudeBeep(2, 900f);   // 2 beeps
+            customClips[AlertType.Altitude10] = GenerateAltitudeBeep(1, 1000f);  // 1 beep, high pitch
+            customClips[AlertType.Altitude5] = GenerateAltitudeBeep(1, 1200f);   // 1 higher beep
+            customClips[AlertType.Retard] = GenerateRetardTone();                // Special retard tone
+        }
+
+        private AudioClip GenerateAltitudeBeep(int beepCount, float frequency)
+        {
+            int sampleRate = 44100;
+            float beepDuration = 0.08f;
+            float gapDuration = 0.06f;
+            float totalDuration = beepCount * beepDuration + (beepCount - 1) * gapDuration + 0.05f;
+            int samples = (int)(sampleRate * totalDuration);
+            float[] data = new float[samples];
+
+            for (int b = 0; b < beepCount; b++)
+            {
+                float beepStart = b * (beepDuration + gapDuration);
+                int startSample = (int)(beepStart * sampleRate);
+                int endSample = (int)((beepStart + beepDuration) * sampleRate);
+
+                for (int i = startSample; i < endSample && i < samples; i++)
+                {
+                    float t = (float)(i - startSample) / sampleRate;
+                    float localT = t / beepDuration;
+
+                    // Soft envelope
+                    float envelope = Mathf.Sin(Mathf.PI * localT);
+
+                    data[i] = Mathf.Sin(2 * Mathf.PI * frequency * t) * 0.4f * envelope;
+                }
+            }
+
+            AudioClip clip = AudioClip.Create($"Altitude{beepCount}", samples, 1, sampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private AudioClip GenerateRetardTone()
+        {
+            // Two-tone "retard" warning: descending pitch pattern
+            int sampleRate = 44100;
+            float duration = 0.6f;
+            int samples = (int)(sampleRate * duration);
+            float[] data = new float[samples];
+
+            float freq1 = 800f;
+            float freq2 = 600f;
+
+            for (int i = 0; i < samples; i++)
+            {
+                float t = (float)i / sampleRate;
+
+                // Two segments
+                float envelope;
+                float freq;
+
+                if (t < 0.25f)
+                {
+                    envelope = Mathf.Sin(Mathf.PI * t / 0.25f);
+                    freq = freq1;
+                }
+                else if (t < 0.35f)
+                {
+                    envelope = 0f; // gap
+                    freq = 0f;
+                }
+                else if (t < 0.6f)
+                {
+                    float localT = t - 0.35f;
+                    envelope = Mathf.Sin(Mathf.PI * localT / 0.25f);
+                    freq = freq2;
+                }
+                else
+                {
+                    envelope = 0f;
+                    freq = 0f;
+                }
+
+                if (freq > 0)
+                {
+                    data[i] = Mathf.Sin(2 * Mathf.PI * freq * t) * 0.5f * envelope;
+                }
+            }
+
+            AudioClip clip = AudioClip.Create("Retard", samples, 1, sampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
         }
 
         private AudioClip GenerateWarningTone()
@@ -207,10 +329,18 @@ namespace KSPAlert
             return clip;
         }
 
+        public bool IsPlaying()
+        {
+            return audioSource != null && audioSource.isPlaying;
+        }
+
         public void PlayAlert(Alert alert)
         {
             var config = AlertManager.Instance?.Config;
             if (config == null || !config.AudioEnabled) return;
+
+            // Don't play if audio is already playing (prevents overlap)
+            if (audioSource.isPlaying) return;
 
             // Prevent audio spam
             if (Time.time - lastPlayTime < MIN_PLAY_INTERVAL) return;
