@@ -193,17 +193,17 @@ namespace KSPAlert
 
         private void OnButtonTrue()
         {
-            if (AlertPanel.Instance != null)
+            if (AlertMainWindow.Instance != null)
             {
-                AlertPanel.Instance.ShowPanel();
+                AlertMainWindow.Instance.ShowWindow();
             }
         }
 
         private void OnButtonFalse()
         {
-            if (AlertPanel.Instance != null)
+            if (AlertMainWindow.Instance != null)
             {
-                AlertPanel.Instance.HidePanel();
+                AlertMainWindow.Instance.HideWindow();
             }
         }
     }

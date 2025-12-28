@@ -184,7 +184,12 @@ namespace KSPAlert
 
         private bool IsAlertSilenced(AlertType type)
         {
-            return AlertPanel.Instance != null && AlertPanel.Instance.IsAlertSilenced(type);
+            // Check both old panel and new main window for backwards compatibility
+            if (AlertMainWindow.Instance != null && AlertMainWindow.Instance.IsAlertSilenced(type))
+                return true;
+            if (AlertPanel.Instance != null && AlertPanel.Instance.IsAlertSilenced(type))
+                return true;
+            return false;
         }
 
         private void CheckTerrainAlert()
