@@ -39,36 +39,56 @@ namespace KSPAlert
 
         private AudioClip GenerateWarningTone()
         {
+            // Fire bell alarm: rapid ding-ding-ding-ding pattern
             int sampleRate = 44100;
-            float duration = 0.8f;
+            float duration = 2.0f;  // Longer duration for multiple dings
             int samples = (int)(sampleRate * duration);
             float[] data = new float[samples];
 
-            // Alternating high-low tone (classic GPWS style)
-            float freq1 = 1200f;
-            float freq2 = 800f;
-            float switchTime = 0.15f;
+            // Bell parameters
+            float bellFreq = 2400f;      // High pitched bell
+            float bellFreq2 = 3000f;     // Second harmonic
+            float bellFreq3 = 3600f;     // Third harmonic
+            float dingInterval = 0.12f;  // Time between each ding (fast!)
+            float dingDuration = 0.1f;   // Each ding length
+
+            int numDings = (int)(duration / dingInterval);
 
             for (int i = 0; i < samples; i++)
             {
                 float t = (float)i / sampleRate;
-                float cyclePos = t % (switchTime * 2);
-                float freq = cyclePos < switchTime ? freq1 : freq2;
+                data[i] = 0f;
 
-                // Add slight frequency wobble for urgency
-                freq += Mathf.Sin(t * 30f) * 20f;
+                // Generate each ding
+                for (int d = 0; d < numDings; d++)
+                {
+                    float dingStart = d * dingInterval;
+                    float dingTime = t - dingStart;
 
-                float envelope = 1f;
-                if (t < 0.02f) envelope = t / 0.02f;
-                if (t > duration - 0.05f) envelope = (duration - t) / 0.05f;
+                    if (dingTime >= 0 && dingTime < dingDuration)
+                    {
+                        // Sharp attack, fast decay (bell-like)
+                        float attack = Mathf.Min(1f, dingTime / 0.002f);  // 2ms attack
+                        float decay = Mathf.Exp(-dingTime * 40f);         // Fast decay
+                        float envelope = attack * decay;
 
-                data[i] = Mathf.Sin(2 * Mathf.PI * freq * t) * 0.7f * envelope;
+                        // Bell sound with harmonics
+                        float bell = Mathf.Sin(2 * Mathf.PI * bellFreq * dingTime) * 0.5f;
+                        bell += Mathf.Sin(2 * Mathf.PI * bellFreq2 * dingTime) * 0.3f;
+                        bell += Mathf.Sin(2 * Mathf.PI * bellFreq3 * dingTime) * 0.15f;
 
-                // Add harmonics for more piercing sound
-                data[i] += Mathf.Sin(2 * Mathf.PI * freq * 2 * t) * 0.2f * envelope;
+                        // Add metallic shimmer
+                        bell += Mathf.Sin(2 * Mathf.PI * (bellFreq * 2.4f) * dingTime) * 0.1f * envelope;
+
+                        data[i] += bell * envelope * 0.6f;
+                    }
+                }
+
+                // Clamp to prevent clipping
+                data[i] = Mathf.Clamp(data[i], -1f, 1f);
             }
 
-            AudioClip clip = AudioClip.Create("WarningTone", samples, 1, sampleRate, false);
+            AudioClip clip = AudioClip.Create("WarningBell", samples, 1, sampleRate, false);
             clip.SetData(data, 0);
             return clip;
         }
