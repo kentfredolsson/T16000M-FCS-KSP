@@ -20,7 +20,8 @@ namespace KSPAlert
         public bool CommsEnabled = true;
 
         // Thresholds
-        public float TerrainWarningAltitude = 500f;      // meters AGL
+        public float TerrainWarningTime = 6.5f;          // seconds to impact
+        public float TerrainWarningAltitude = 500f;      // meters AGL (fallback)
         public float TerrainCautionAltitude = 1000f;     // meters AGL
         public float TerrainMinDescentRate = -50f;       // m/s (negative = descending)
 
@@ -68,6 +69,7 @@ namespace KSPAlert
             root.AddValue("HighGEnabled", HighGEnabled);
             root.AddValue("CommsEnabled", CommsEnabled);
 
+            root.AddValue("TerrainWarningTime", TerrainWarningTime);
             root.AddValue("TerrainWarningAltitude", TerrainWarningAltitude);
             root.AddValue("TerrainCautionAltitude", TerrainCautionAltitude);
             root.AddValue("TerrainMinDescentRate", TerrainMinDescentRate);
@@ -110,6 +112,7 @@ namespace KSPAlert
             bool.TryParse(root.GetValue("HighGEnabled"), out HighGEnabled);
             bool.TryParse(root.GetValue("CommsEnabled"), out CommsEnabled);
 
+            float.TryParse(root.GetValue("TerrainWarningTime"), out TerrainWarningTime);
             float.TryParse(root.GetValue("TerrainWarningAltitude"), out TerrainWarningAltitude);
             float.TryParse(root.GetValue("TerrainCautionAltitude"), out TerrainCautionAltitude);
             float.TryParse(root.GetValue("TerrainMinDescentRate"), out TerrainMinDescentRate);

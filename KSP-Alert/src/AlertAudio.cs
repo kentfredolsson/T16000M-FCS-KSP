@@ -1,5 +1,8 @@
 using System.Collections.Generic;
+using System.Collections;
+using System.IO;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace KSPAlert
 {
@@ -7,9 +10,13 @@ namespace KSPAlert
     {
         private AudioSource audioSource;
         private Dictionary<AlertPriority, AudioClip> toneClips;
+        private Dictionary<AlertType, AudioClip> customClips;
 
         private float lastPlayTime;
         private const float MIN_PLAY_INTERVAL = 0.5f;
+
+        private static readonly string SoundsPath =
+            KSPUtil.ApplicationRootPath + "GameData/KSP-Alert/Sounds/";
 
         void Start()
         {
@@ -18,16 +25,71 @@ namespace KSPAlert
             audioSource.loop = false;
             audioSource.spatialBlend = 0f; // 2D sound
 
+            customClips = new Dictionary<AlertType, AudioClip>();
+
             GenerateTones();
+            StartCoroutine(LoadCustomSounds());
 
             Debug.Log("[KSP-Alert] Audio system initialized");
+        }
+
+        private IEnumerator LoadCustomSounds()
+        {
+            // Create sounds directory if it doesn't exist
+            if (!Directory.Exists(SoundsPath))
+            {
+                Directory.CreateDirectory(SoundsPath);
+                Debug.Log($"[KSP-Alert] Created sounds directory: {SoundsPath}");
+            }
+
+            // Try to load custom terrain warning sound
+            yield return StartCoroutine(LoadSound("terrain.wav", AlertType.Terrain));
+            yield return StartCoroutine(LoadSound("gear.wav", AlertType.GearUp));
+            yield return StartCoroutine(LoadSound("fuel.wav", AlertType.LowFuel));
+            yield return StartCoroutine(LoadSound("power.wav", AlertType.LowPower));
+            yield return StartCoroutine(LoadSound("overheat.wav", AlertType.Overheat));
+            yield return StartCoroutine(LoadSound("stall.wav", AlertType.Stall));
+            yield return StartCoroutine(LoadSound("gforce.wav", AlertType.HighG));
+            yield return StartCoroutine(LoadSound("comms.wav", AlertType.CommsLost));
+        }
+
+        private IEnumerator LoadSound(string filename, AlertType alertType)
+        {
+            string filePath = SoundsPath + filename;
+
+            if (!File.Exists(filePath))
+            {
+                Debug.Log($"[KSP-Alert] No custom sound file: {filename}");
+                yield break;
+            }
+
+            string uri = "file://" + filePath;
+            using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(uri, AudioType.WAV))
+            {
+                yield return www.SendWebRequest();
+
+                // Use older API compatible with KSP's Unity version
+                if (string.IsNullOrEmpty(www.error))
+                {
+                    AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
+                    if (clip != null)
+                    {
+                        customClips[alertType] = clip;
+                        Debug.Log($"[KSP-Alert] Loaded custom sound: {filename}");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"[KSP-Alert] Failed to load {filename}: {www.error}");
+                }
+            }
         }
 
         private void GenerateTones()
         {
             toneClips = new Dictionary<AlertPriority, AudioClip>();
 
-            // Warning: Urgent dual-tone (like GPWS)
+            // Warning: Fire bell alarm
             toneClips[AlertPriority.Warning] = GenerateWarningTone();
 
             // Caution: Single attention tone
@@ -154,11 +216,24 @@ namespace KSPAlert
             if (Time.time - lastPlayTime < MIN_PLAY_INTERVAL) return;
             lastPlayTime = Time.time;
 
-            if (toneClips.TryGetValue(alert.Priority, out AudioClip clip))
+            AudioClip clip = null;
+
+            // First check for custom sound file for this alert type
+            if (customClips.TryGetValue(alert.Type, out AudioClip customClip))
+            {
+                clip = customClip;
+                Debug.Log($"[KSP-Alert] Playing custom sound for {alert.Type}");
+            }
+            // Fall back to generated tone based on priority
+            else if (toneClips.TryGetValue(alert.Priority, out AudioClip priorityClip))
+            {
+                clip = priorityClip;
+            }
+
+            if (clip != null)
             {
                 audioSource.volume = config.MasterVolume;
                 audioSource.PlayOneShot(clip);
-
                 Debug.Log($"[KSP-Alert] Playing {alert.Priority} alert: {alert.Message}");
             }
         }

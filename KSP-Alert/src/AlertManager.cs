@@ -198,10 +198,25 @@ namespace KSPAlert
 
             var alert = alerts[AlertType.Terrain];
 
-            // Only trigger if descending toward terrain
-            bool inDanger = altitudeAGL < Config.TerrainWarningAltitude &&
-                           verticalSpeed < Config.TerrainMinDescentRate &&
-                           vessel.situation == Vessel.Situations.FLYING;
+            // Calculate time to impact based on current descent rate
+            // Only valid if descending (negative vertical speed)
+            double timeToImpact = double.MaxValue;
+            if (verticalSpeed < -1) // Descending at least 1 m/s
+            {
+                timeToImpact = altitudeAGL / (-verticalSpeed);
+            }
+
+            // Trigger if:
+            // 1. Time to impact is less than configured seconds (default 6.5s), OR
+            // 2. Below minimum altitude AND descending fast (fallback)
+            bool timeBasedDanger = timeToImpact <= Config.TerrainWarningTime &&
+                                   vessel.situation == Vessel.Situations.FLYING;
+
+            bool altitudeBasedDanger = altitudeAGL < Config.TerrainWarningAltitude &&
+                                       verticalSpeed < Config.TerrainMinDescentRate &&
+                                       vessel.situation == Vessel.Situations.FLYING;
+
+            bool inDanger = timeBasedDanger || altitudeBasedDanger;
 
             if (inDanger)
             {

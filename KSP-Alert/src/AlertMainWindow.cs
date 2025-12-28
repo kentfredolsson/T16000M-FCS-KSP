@@ -381,8 +381,9 @@ namespace KSPAlert
             GUILayout.Space(15);
 
             // Terrain settings
-            GUILayout.Label("Terrain Warning", sectionStyle);
-            DrawSlider("Warning Alt (m):", ref config.TerrainWarningAltitude, 100f, 2000f);
+            GUILayout.Label("Terrain Warning (GPWS)", sectionStyle);
+            DrawSlider("Time to Impact (s):", ref config.TerrainWarningTime, 3f, 15f);
+            DrawSlider("Fallback Alt (m):", ref config.TerrainWarningAltitude, 100f, 2000f);
             DrawSlider("Descent Rate (m/s):", ref config.TerrainMinDescentRate, -200f, -10f);
 
             GUILayout.Space(10);
@@ -532,6 +533,7 @@ namespace KSPAlert
         private void ResetToDefaults(AlertConfig config)
         {
             var defaults = new AlertConfig();
+            config.TerrainWarningTime = defaults.TerrainWarningTime;
             config.TerrainWarningAltitude = defaults.TerrainWarningAltitude;
             config.TerrainMinDescentRate = defaults.TerrainMinDescentRate;
             config.GearWarningAltitude = defaults.GearWarningAltitude;
