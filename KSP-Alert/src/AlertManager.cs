@@ -352,11 +352,22 @@ namespace KSPAlert
             if (alerts.ContainsKey(type))
             {
                 var alert = alerts[type];
-                if (alert.CanTrigger())
-                {
-                    alert.Trigger();
-                    audio?.PlayAlert(alert);
-                }
+                alert.Trigger();
+                audio?.PlayAlert(alert);
+            }
+        }
+
+        public void TriggerTestAlert(AlertType type)
+        {
+            // Force trigger for testing, bypass cooldown
+            if (alerts.ContainsKey(type))
+            {
+                var alert = alerts[type];
+                alert.LastTriggered = 0f; // Reset cooldown
+                alert.Trigger();
+                audio?.PlayAlert(alert);
+                activeAlerts.Add(alert);
+                display?.UpdateAlerts(activeAlerts);
             }
         }
     }

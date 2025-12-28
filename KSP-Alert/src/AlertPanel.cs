@@ -8,6 +8,7 @@ namespace KSPAlert
     {
         private bool showPanel = true;
         private bool panelMinimized = false;
+        private bool showTestButtons = false;
         private Rect panelRect;
         private int windowId;
 
@@ -22,6 +23,7 @@ namespace KSPAlert
         private GUIStyle silenceButtonStyle;
         private GUIStyle volumeButtonStyle;
         private GUIStyle minimizedStyle;
+        private GUIStyle testButtonStyle;
         private bool stylesInitialized = false;
 
         // Textures
@@ -139,6 +141,13 @@ namespace KSPAlert
                 normal = { background = panelBg, textColor = Color.white }
             };
 
+            testButtonStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = 9,
+                fontStyle = FontStyle.Bold,
+                padding = new RectOffset(1, 1, 1, 1)
+            };
+
             stylesInitialized = true;
         }
 
@@ -250,6 +259,19 @@ namespace KSPAlert
             GUILayout.EndHorizontal();
 
             GUILayout.Space(5);
+
+            // Test buttons toggle
+            if (GUILayout.Button(showTestButtons ? "HIDE TEST BUTTONS" : "SHOW TEST BUTTONS", GUILayout.Height(22)))
+            {
+                showTestButtons = !showTestButtons;
+            }
+
+            if (showTestButtons)
+            {
+                DrawTestButtons();
+            }
+
+            GUILayout.Space(5);
             GUILayout.Label("F10: Settings | F11: Toggle Panel", GUI.skin.label);
 
             GUI.DragWindow();
@@ -292,6 +314,96 @@ namespace KSPAlert
             GUILayout.Space(60);
             config.MasterVolume = GUILayout.HorizontalSlider(config.MasterVolume, 0f, 1f, GUILayout.Width(140));
             GUILayout.EndHorizontal();
+        }
+
+        private void DrawTestButtons()
+        {
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label("TEST ALERTS", headerStyle);
+
+            // Warning tests (red)
+            GUILayout.BeginHorizontal();
+            GUI.backgroundColor = new Color(0.8f, 0.2f, 0.2f);
+            if (GUILayout.Button("TERRAIN", testButtonStyle, GUILayout.Height(28)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.Terrain);
+            }
+            if (GUILayout.Button("HEAT", testButtonStyle, GUILayout.Height(28)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.Overheat);
+            }
+            if (GUILayout.Button("STALL", testButtonStyle, GUILayout.Height(28)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.Stall);
+            }
+            GUILayout.EndHorizontal();
+
+            // Caution tests (amber)
+            GUILayout.BeginHorizontal();
+            GUI.backgroundColor = new Color(0.9f, 0.6f, 0.1f);
+            if (GUILayout.Button("GEAR", testButtonStyle, GUILayout.Height(28)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.GearUp);
+            }
+            if (GUILayout.Button("FUEL", testButtonStyle, GUILayout.Height(28)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.LowFuel);
+            }
+            if (GUILayout.Button("POWER", testButtonStyle, GUILayout.Height(28)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.LowPower);
+            }
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("G-FORCE", testButtonStyle, GUILayout.Height(28)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.HighG);
+            }
+            if (GUILayout.Button("COMMS", testButtonStyle, GUILayout.Height(28)))
+            {
+                AlertManager.Instance?.TriggerTestAlert(AlertType.CommsLost);
+            }
+            GUI.backgroundColor = Color.white;
+            GUILayout.EndHorizontal();
+
+            // Test all button
+            GUILayout.Space(5);
+            GUI.backgroundColor = new Color(0.3f, 0.3f, 0.8f);
+            if (GUILayout.Button("TEST ALL SOUNDS", GUILayout.Height(25)))
+            {
+                TestAllAlerts();
+            }
+            GUI.backgroundColor = Color.white;
+
+            GUILayout.EndVertical();
+        }
+
+        private void TestAllAlerts()
+        {
+            StartCoroutine(TestAllAlertsSequence());
+        }
+
+        private System.Collections.IEnumerator TestAllAlertsSequence()
+        {
+            AlertType[] testOrder = {
+                AlertType.Terrain,
+                AlertType.Overheat,
+                AlertType.Stall,
+                AlertType.GearUp,
+                AlertType.LowFuel,
+                AlertType.LowPower,
+                AlertType.HighG,
+                AlertType.CommsLost
+            };
+
+            foreach (var alertType in testOrder)
+            {
+                AlertManager.Instance?.TriggerTestAlert(alertType);
+                yield return new WaitForSeconds(1.5f);
+            }
+
+            ScreenMessages.PostScreenMessage("Alert test complete", 2f);
         }
 
         private void DrawAlertRow(string label, AlertType type, bool enabled, Texture2D bgTex)
@@ -369,6 +481,27 @@ namespace KSPAlert
         public bool IsAlertSilenced(AlertType type)
         {
             return silencedAlerts.Contains(type);
+        }
+
+        public void ShowPanel()
+        {
+            showPanel = true;
+            panelMinimized = false;
+        }
+
+        public void HidePanel()
+        {
+            showPanel = false;
+        }
+
+        public void TogglePanel()
+        {
+            showPanel = !showPanel;
+        }
+
+        public bool IsPanelVisible()
+        {
+            return showPanel && !panelMinimized;
         }
 
         public static AlertPanel Instance { get; private set; }
