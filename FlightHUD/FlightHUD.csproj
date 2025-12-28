@@ -1,30 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
-    <LangVersion>latest</LangVersion>
     <AssemblyName>FlightHUD</AssemblyName>
     <RootNamespace>FlightHUD</RootNamespace>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <LangVersion>latest</LangVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <OutputPath>bin\Release\</OutputPath>
-    <DebugType>none</DebugType>
-    <Optimize>true</Optimize>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
-  <!-- KSP installation path -->
   <PropertyGroup>
     <KSPPath>$(HOME)/Library/Application Support/Steam/steamapps/common/Kerbal Space Program - Modded</KSPPath>
     <KSPManagedPath>$(KSPPath)/KSP.app/Contents/Resources/Data/Managed</KSPManagedPath>
     <GameDataPath>$(KSPPath)/GameData/FlightHUD</GameDataPath>
   </PropertyGroup>
 
-  <!-- Source files -->
   <ItemGroup>
-    <Compile Include="src\*.cs" />
+    <Compile Include="src/**/*.cs" />
   </ItemGroup>
 
-  <!-- KSP and Unity references -->
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
       <HintPath>$(KSPManagedPath)/Assembly-CSharp.dll</HintPath>
@@ -38,12 +31,12 @@
       <HintPath>$(KSPManagedPath)/UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>$(KSPManagedPath)/UnityEngine.InputLegacyModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
       <HintPath>$(KSPManagedPath)/UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(KSPManagedPath)/UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">
@@ -58,18 +51,11 @@
       <HintPath>$(KSPManagedPath)/UnityEngine.AnimationModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="UnityEngine.ImageConversionModule">
-      <HintPath>$(KSPManagedPath)/UnityEngine.ImageConversionModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
   </ItemGroup>
 
-  <!-- Copy DLL and assets to GameData after build -->
   <Target Name="CopyToGameData" AfterTargets="Build">
     <MakeDir Directories="$(GameDataPath)" Condition="!Exists('$(GameDataPath)')" />
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(GameDataPath)" />
-    <Copy SourceFiles="assets\icon_toolbar.png" DestinationFolder="$(GameDataPath)" Condition="Exists('assets\icon_toolbar.png')" />
     <Message Text="Copied $(AssemblyName).dll to $(GameDataPath)" Importance="high" />
   </Target>
-
 </Project>
